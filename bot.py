@@ -12,8 +12,7 @@ driver.register_adapter(ONEBOT_V11Adapter)
 
 driver.register_adapter(飞书Adapter)
 
-
-nonebot.load_from_toml("pyproject.toml")
+nonebot.load_plugin("noticebot.plugins.bridge")  
 
 if __name__ == "__main__":
     nonebot.run()
