@@ -20,7 +20,7 @@ test = on_message(rule=to_me(), priority=10)
 @test.handle()
 async def handle_function(event: Event):
     msg = f'{event.get_session_id()} says:{event.get_plaintext()}'
-    msg_json= json.dumps({"text":msg,"type":"template"},ensure_ascii=False)
+    msg_json= json.dumps({"text":msg},ensure_ascii=False)
     request: lark.api.im.v1.CreateMessageRequest = lark.api.im.v1.CreateMessageRequest.builder() \
         .receive_id_type("chat_id") \
         .request_body(lark.api.im.v1.CreateMessageRequestBody.builder()
