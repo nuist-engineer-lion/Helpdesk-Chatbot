@@ -30,14 +30,14 @@ config = get_plugin_config(Config)
 
 # 定义规则
 async def is_engineer(event: MessageEvent) -> bool:
-    return event.get_user_id() in config.ENGINEERS
+    return event.get_user_id() in config.engineers
 
 async def is_customer(event: PrivateMessageEvent) -> bool:
     return await is_engineer(event) is False
 
 # 定义响应器
-customer_message = on_message(rule=is_customer & to_me)
-engineer_message = on_message(rule=is_engineer & to_me)
+customer_message = on_message(rule=is_customer & to_me())
+engineer_message = on_message(rule=is_engineer & to_me())
 
 # 回复客户消息
 @customer_message.handle()
@@ -56,7 +56,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
         if datetime.now() > get_ticket(ticket_id)['creating_expired_at']:
             update_ticket(ticket_id, status='processing') # 更新工单状态为处理中
             # 将工单创建起至当下的消息合并转发至【通知群】
-            print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.NOTIFY_GROUP)
+            print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.notify_group)
             await customer_message.finish("您的问题已经记录并提交工程师，正在派单请稍等...")
     elif get_ticket(ticket_id)['status'] == 'processing':
         if get_ticket(ticket_id)['engineer_id'] == '':
@@ -66,8 +66,8 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
             # 如果当前时间大于工单处理中过期时间
             if datetime.now() > get_ticket(ticket_id)['processing_expired_at']:
                 # 将工单创建起至当下的消息合并转发至【通知群】
-                print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.NOTIFY_GROUP)
-                bot.send_group_msg(group_id=config.NOTIFY_GROUP, message="工程师接单超时，请尽快处理！")
+                print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.notify_group)
+                bot.send_group_msg(group_id=config.notify_group, message="工程师接单超时，请尽快处理！")
                 await customer_message.finish("不好意思啦，刚才工程师开小差了，正在积极为您联系工程师！")
         else:
             # 将消息转发至工程师
