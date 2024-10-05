@@ -10,15 +10,15 @@ adapters = [
     { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" },
     { name = "飞书", module_name = "nonebot.adapters.feishu" }
 ]
-plugins = []
-plugin_dirs = []
+plugins = ["nonebot_plugin_chatrecorder"]
+plugin_dirs = ["src/plugins"]
 builtin_plugins = []
 
 [tool.poetry]
 name = "noticebot"
 version = "0.1.0"
 description = ""
-authors = ["jerry-harm <109275116+jerry-harm@users.noreply.github.com>"]
+authors = ["jerry-harm <109275116+jerry-harm@users.noreply.github.com>", "faithleysath <faithleysath@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 
