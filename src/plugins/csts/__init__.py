@@ -45,11 +45,11 @@ engineer_message = on_message(rule=is_engineer & to_me())
 # 回复客户消息
 @customer_message.handle()
 async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
-    # 延时3~5秒，用于模拟工程师接单
-    await sleep(random.randint(3, 5))
     uid = event.get_user_id()
     ticket_id = get_latest_active_ticket_by_user_id(uid) # 获取用户最新的工单
     if ticket_id is None: # 如果没有工单
+        # 延时3~5秒，用于模拟工程师接单
+        await sleep(random.randint(3, 5))
         await customer_message.send("您好，欢迎联系咨询，请详细描述您的问题，我们会尽快为您解答。")
         # 创建工单
         ticket_id = create_ticket(uid, datetime.fromtimestamp(event.time, cst))
@@ -58,11 +58,13 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
         # 等待waiting_time秒
         await sleep(config.waiting_time+2)
         # 如果当前时间大于工单创建中过期时间
-        if datetime.now() > get_ticket(ticket_id)['creating_expired_at']:
+        if datetime.now() > get_ticket(ticket_id)['creating_expired_at'] and get_ticket(ticket_id)['status'] == 'creating':
             update_ticket(ticket_id, status='processing') # 更新工单状态为处理中
             # 将工单创建起至当下的消息合并转发至【通知群】
-            await print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.notify_group)
             await customer_message.finish("您的问题已经记录并提交工程师，正在派单请稍等...")
+            await print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.notify_group, delay=30)
+            # @全体成员 有新工单，请尽快处理！
+            await bot.send_group_msg(group_id=config.notify_group, message="[CQ:at,qq=all] 有新工单，请尽快处理！")
     elif get_ticket(ticket_id)['status'] == 'processing':
         if get_ticket(ticket_id)['engineer_id'] == '':
             update_ticket(ticket_id, processing_expired_at=datetime.now() + timedelta(seconds=config.waiting_time / 2))
@@ -71,9 +73,9 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
             # 如果当前时间大于工单处理中过期时间
             if datetime.now() > get_ticket(ticket_id)['processing_expired_at']:
                 # 将工单创建起至当下的消息合并转发至【通知群】
-                await print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.notify_group)
-                await bot.send_group_msg(group_id=config.notify_group, message="工程师接单超时，请尽快处理！")
                 await customer_message.finish("不好意思啦，刚才工程师开小差了，正在积极为您联系工程师！")
+                await print_ticket(event=event, bot=bot, ticket_id=ticket_id, target_group_id=config.notify_group, delay=30)
+                await bot.send_group_msg(group_id=config.notify_group, message="工程师接单超时，请尽快处理！")
         else:
             # 将消息转发至工程师
             await bot.send_private_msg(user_id=get_ticket(ticket_id)['engineer_id'], message=event.get_message())
@@ -81,13 +83,13 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
 # 回复工程师消息
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent):
-    # 延时3~5秒，用于模拟工程师接单
-    await sleep(random.randint(3, 5))
     uid = event.get_user_id()
     plain_message = event.get_plaintext()
     ticket_id = get_ticket_by_engineer_id(uid)
     if "查看工单" in plain_message:
         ticket_ids = get_all_tickets()
+        if len(ticket_ids) == 0:
+            await engineer_message.finish("当前没有工单！")
         for ticket_id in ticket_ids:
             if get_ticket(ticket_id)['status'] != 'closed':
                 await print_ticket(event=event, bot=bot, ticket_id=ticket_id)
@@ -103,12 +105,17 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent):
             await engineer_message.finish("当前暂不支持同时接多个工单！请先处理完当前工单再接单！")
         try:
             ticket_id = plain_message.split("接单")[-1].strip()
+            if ticket_id == "" or ticket_id is None:
+                raise KeyError
         except KeyError:
             await engineer_message.finish("接单失败！请指定工单号！")
         ticket = get_ticket(ticket_id)
         if ticket['status'] == 'processing' and ticket['engineer_id'] == '':
             update_ticket(ticket_id, engineer_id=uid)
-            await engineer_message.finish("接单成功！接下来请与我一对一私聊，我会将用户消息转发给您！")
+            await engineer_message.send("接单成功！接下来请与我一对一私聊，我会将用户消息转发给您！")
+            # 告知用户工程师已接单，并发送工程师的名片
+            await bot.send_private_msg(user_id=ticket['customer_id'], message=f"工程师{uid}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！")
+            await bot.send_private_msg(user_id=ticket['customer_id'], message=f"[CQ:contact,type=qq,id={uid}]")
         else:
             await engineer_message.finish("接单失败！下次早点来哦！")
     elif "关闭工单" in plain_message:
@@ -122,6 +129,6 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent):
         if ticket_id is not None:
             # 将消息转发至客户
             await bot.send_private_msg(user_id=get_ticket(ticket_id)['customer_id'], message=event.get_message())
-            await engineer_message.finish("消息已转发至客户！")
+            # await engineer_message.finish("消息已转发至客户！")
         else:
             await engineer_message.finish("可用指令：查看工单、接单、取消接单、关闭工单")

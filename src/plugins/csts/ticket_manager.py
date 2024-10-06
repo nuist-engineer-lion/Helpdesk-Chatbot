@@ -98,10 +98,10 @@ def get_latest_active_ticket_by_user_id(user_id: str) -> str:
     # 找出最新的工单，按照begin_at排序
     return sorted(active_tickets, key=lambda x: tickets[x]['begin_at'], reverse=True)[0]
 
-async def print_ticket(event, bot, ticket_id, target_group_id=None):
+async def print_ticket(event, bot, ticket_id, target_group_id=None, delay=0):
     # 延时3~5秒，用于模拟工程师接单
     print("被调用")
-    await sleep(random.randint(3, 5))
+    await sleep(delay)
     ticket = get_ticket(ticket_id)
     msgs = []
     msgs.append(Message(ticket_id))
