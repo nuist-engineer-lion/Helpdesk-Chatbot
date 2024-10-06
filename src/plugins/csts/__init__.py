@@ -76,7 +76,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent):
                 await customer_message.finish("不好意思啦，刚才工程师开小差了，正在积极为您联系工程师！")
         else:
             # 将消息转发至工程师
-            bot.send_private_msg(user_id=get_ticket(ticket_id)['engineer_id'], message=event.get_message())
+            await bot.send_private_msg(user_id=get_ticket(ticket_id)['engineer_id'], message=event.get_message())
 
 # 回复工程师消息
 @engineer_message.handle()
@@ -97,9 +97,14 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent):
                 update_ticket(ticket_id, engineer_id='')
                 await engineer_message.finish("取消接单成功！")
         else:
-            await engineer_message.finish("你没单取消个啥？空气吗？")
+            await engineer_message.finish("没单你取消个啥？空气吗？")
     elif "接单" in plain_message:
-        ticket_id = plain_message.split("接单")[-1].strip()
+        if ticket_id is not None:
+            await engineer_message.finish("当前暂不支持同时接多个工单！请先处理完当前工单再接单！")
+        try:
+            ticket_id = plain_message.split("接单")[-1].strip()
+        except KeyError:
+            await engineer_message.finish("接单失败！请指定工单号！")
         ticket = get_ticket(ticket_id)
         if ticket['status'] == 'processing' and ticket['engineer_id'] == '':
             update_ticket(ticket_id, engineer_id=uid)
@@ -112,11 +117,11 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent):
                 update_ticket(ticket_id, status='closed', end_at=datetime.fromtimestamp(event.time, cst))
                 await engineer_message.finish("关闭工单成功！")
         else:
-            await engineer_message.finish("你没单关闭个啥？空气吗？")
+            await engineer_message.finish("没单你关闭个啥？空气吗？")
     else:
         if ticket_id is not None:
             # 将消息转发至客户
-            bot.send_private_msg(user_id=get_ticket(ticket_id)['customer_id'], message=event.get_message())
+            await bot.send_private_msg(user_id=get_ticket(ticket_id)['customer_id'], message=event.get_message())
             await engineer_message.finish("消息已转发至客户！")
         else:
             await engineer_message.finish("可用指令：查看工单、接单、取消接单、关闭工单")
