@@ -62,12 +62,18 @@ sample_ticket = {
     "customer_id": "",
 }
 
-# TODO load from database
 tickets = {}
 
-async def create_ticket(customer_id: str, begin_at: datetime,
-    sess: async_scoped_session) -> str:
-    ticket_id = str(uuid.uuid4())
+async def init_tickets(sess: async_scoped_session):
+    # not empty then not init
+    if tickets:
+        return
+    # add all
+    db_tickets = (await sess.execute(select(model.Ticket))).scalars()
+    for ticket in db_tickets:
+        create_mem_ticket(ticket.uid,ticket.customer_id,ticket.begin_at)
+
+def create_mem_ticket(ticket_id: str,customer_id: str, begin_at: datetime):
     tickets[ticket_id] = {
         "ticket_id": ticket_id,
         "begin_at": begin_at,
@@ -78,6 +84,12 @@ async def create_ticket(customer_id: str, begin_at: datetime,
         "engineer_id": "",
         "customer_id": customer_id,
     }
+    return tickets
+
+async def create_ticket(customer_id: str, begin_at: datetime,
+    sess: async_scoped_session) -> str:
+    ticket_id = str(uuid.uuid4())
+    create_mem_ticket(ticket_id,customer_id,begin_at)
     db_ticket = model.Ticket(uid=ticket_id,
                                customer_id=customer_id,
                                begin_at=begin_at,
@@ -96,16 +108,7 @@ async def get_ticket(ticket_id: str,sess: async_scoped_session) -> dict|None:
     try:
         return tickets[ticket_id]
     except:
-        try:
-            db_ticket:model.Ticket|None = (await sess.execute(select(model.Ticket).where(model.Ticket.uid==ticket_id))).scalar()
-            if not db_ticket:
-                return None
-            id:str = db_ticket.uid
-            # kind of lazy load?
-            await create_ticket(db_ticket.customer_id,db_ticket.begin_at,sess)
-            return id
-        except:
-            return None
+        return None
 
 async def update_ticket(ticket_id: str,sess: async_scoped_session, **kwargs):
     tickets[ticket_id].update(kwargs)
