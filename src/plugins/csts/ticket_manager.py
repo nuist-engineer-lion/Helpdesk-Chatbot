@@ -3,8 +3,18 @@ import uuid
 
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, Message
 from nonebot_plugin_chatrecorder import get_messages
+from nonebot.adapters import Event
+from nonebot import require
+from nonebot.params import Depends
 import random
 from asyncio import sleep
+from . import model
+
+from sqlalchemy import select
+
+require("nonebot_plugin_orm")
+from nonebot_plugin_orm import SQLDepends, async_scoped_session
+
 
 async def send_forward_msg(
         bot: Bot,
@@ -52,9 +62,11 @@ sample_ticket = {
     "customer_id": "",
 }
 
+# TODO load from database
 tickets = {}
 
-def create_ticket(customer_id: str, begin_at: datetime) -> str:
+async def create_ticket(customer_id: str, begin_at: datetime,
+    sess: async_scoped_session) -> str:
     ticket_id = str(uuid.uuid4())
     tickets[ticket_id] = {
         "ticket_id": ticket_id,
@@ -66,26 +78,56 @@ def create_ticket(customer_id: str, begin_at: datetime) -> str:
         "engineer_id": "",
         "customer_id": customer_id,
     }
-    print(tickets)
-    return ticket_id
+    db_ticket = model.Ticket(uid=ticket_id,
+                               customer_id=customer_id,
+                               begin_at=begin_at,
+                               end_at=begin_at + timedelta(days=9999),
+                               creating_expired_at=begin_at,
+                               processing_expired_at=begin_at,
+                               )
+    try:
+        sess.add(db_ticket)
+        await sess.commit()
+    finally:
+        print(tickets)
+        return ticket_id
 
-def get_ticket(ticket_id: str) -> dict:
-    return tickets[ticket_id]
+async def get_ticket(ticket_id: str,sess: async_scoped_session) -> dict|None:
+    try:
+        return tickets[ticket_id]
+    except:
+        try:
+            db_ticket:model.Ticket|None = (await sess.execute(select(model.Ticket).where(model.Ticket.uid==ticket_id))).scalar()
+            if not db_ticket:
+                return None
+            id:str = db_ticket.uid
+            # kind of lazy load?
+            await create_ticket(db_ticket.customer_id,db_ticket.begin_at,sess)
+            return id
+        except:
+            return None
 
-def update_ticket(ticket_id: str, **kwargs):
+async def update_ticket(ticket_id: str,sess: async_scoped_session, **kwargs):
     tickets[ticket_id].update(kwargs)
+    
+    db_ticket = (await sess.execute(select(model.Ticket).where(model.Ticket.uid==ticket_id))).scalar()
+    # magic!
+    for k,v in kwargs.items():
+        setattr(db_ticket,k,v)
+    await sess.commit()
+    
     print(tickets)
 
 def get_all_tickets() -> list:
     return tickets.keys()
 
-def get_ticket_by_engineer_id(engineer_id: str) -> str:
+def get_ticket_by_engineer_id(engineer_id: str) -> str|None:
     for ticket_id in tickets.keys():
         if tickets[ticket_id]['engineer_id'] == engineer_id:
             return ticket_id
     return None
 
-def get_latest_active_ticket_by_user_id(user_id: str) -> str:
+def get_latest_active_ticket_by_user_id(user_id: str) -> str|None:
     # 先把对应user_id的活跃工单找出来
     active_tickets = []
     for ticket_id in tickets.keys():
@@ -98,11 +140,11 @@ def get_latest_active_ticket_by_user_id(user_id: str) -> str:
     # 找出最新的工单，按照begin_at排序
     return sorted(active_tickets, key=lambda x: tickets[x]['begin_at'], reverse=True)[0]
 
-async def print_ticket(event, bot, ticket_id, target_group_id=None, delay=0):
+async def print_ticket(event, bot, ticket_id,sess: async_scoped_session, target_group_id=None, delay=0):
     # 延时3~5秒，用于模拟工程师接单
     print("被调用")
     await sleep(delay)
-    ticket = get_ticket(ticket_id)
+    ticket = await get_ticket(ticket_id,sess)
     msgs = []
     msgs.append(Message(ticket_id))
     msgs.append(Message("状态：" + ticket['status']))

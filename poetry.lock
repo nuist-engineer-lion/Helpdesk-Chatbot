@@ -858,10 +858,7 @@ alembic = ">=1.13,<2.0"
 click = ">=8.1,<9.0"
 nonebot-plugin-localstore = ">=0.6,<1.0"
 nonebot2 = ">=2.2,<3.0"
-sqlalchemy = [
-    {version = ">=2.0,<3.0"},
-    {version = "*", extras = ["aiosqlite"], optional = true, markers = "extra == \"default\""},
-]
+sqlalchemy = ">=2.0,<3.0"
 
 [package.extras]
 aiomysql = ["sqlalchemy[aiomysql]"]
@@ -1805,4 +1802,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "27288eb2b4d242f2b76c3a67772b8b5a7b0c398ced0a8bb040ca7099f6245727"
+content-hash = "e85d6363326d3edc812c79575caa695faa5c54b1c0306400d13252a9d2ec5bc1"
