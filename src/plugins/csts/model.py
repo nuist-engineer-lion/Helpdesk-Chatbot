@@ -16,7 +16,7 @@ class Ticket(Model):
     end_at = Column(DateTime, nullable=True)
     
     creating_expired_at = Column(DateTime)
-    alarming_expired_at = Column(DateTime)
+    alarming_expired_at = Column(DateTime, nullable=True)
     
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, onupdate=datetime.now)

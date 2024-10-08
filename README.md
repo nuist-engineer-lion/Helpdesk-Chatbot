@@ -7,5 +7,7 @@ python -m pipx ensurepath
 pipx install nb-cli
 nb plugin install nonebot-plugin-localstore
 nb plugin install nonebot_plugin_chatrecorder
-pip install pydantic nonebot-plugin-orm[sqlite] nonebot-adapter-onebot
+nb plugin install nonebot-plugin-apscheduler
+nb plugin install nonebot_plugin_datastore   
+pip install pydantic nonebot-plugin-orm[sqlite] nonebot-adapter-onebot pytz
 ```
