@@ -31,12 +31,8 @@ __plugin_meta__ = PluginMetadata(
 
 config = get_plugin_config(Config)
 
-# 写一个将函数转换为Rule对象的装饰器
-def rule(func):
-    return Rule(func)
-
 # 定义规则
-async def is_engineer(event: MessageEvent) -> bool:
+async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的人员为工程师
     if isinstance(event, GroupMessageEvent):
         return event.group_id == config.notify_group
     return event.get_user_id() in config.engineers

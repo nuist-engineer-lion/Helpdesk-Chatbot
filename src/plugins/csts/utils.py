@@ -4,7 +4,10 @@ from nonebot import require
 require("nonebot_plugin_chatrecorder")
 from nonebot_plugin_chatrecorder import get_message_records
 from nonebot_plugin_orm import get_session
-from datetime import timedelta
+from datetime import datetime
+# 获取中国时区
+from pytz import timezone
+cst = timezone('Asia/Shanghai')
 
 async def send_forward_msg(
         bot: Bot,
@@ -54,8 +57,8 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
         ticket = await session.get(Ticket, ticket_id)
         ticket_id = ticket.id
         ticket_status = ticket.status
-        ticket_begin_at = ticket.begin_at
-        ticket_end_at = ticket.end_at
+        ticket_begin_at = cst.localize(ticket.begin_at)
+        ticket_end_at = None if not ticket.end_at else cst.localize(ticket.end_at)
         ticket_customer_id = ticket.customer_id
         ticket_engineer_id = ticket.engineer_id
     msgs.append(Message(f"工单号: {ticket_id:0>3}"))
@@ -67,7 +70,7 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
     if ticket_engineer_id:
         msgs.append(Message(f"工程师名片[CQ:contact,type=qq,id={ticket_engineer_id}]"))
     # 下面打印历史消息
-    message_records = await get_message_records(id1s=[ticket_customer_id], time_start=ticket_begin_at - timedelta(hours=8), time_stop=None if ticket_end_at is None else ticket_end_at - timedelta(hours=8))
+    message_records = await get_message_records(id1s=[ticket_customer_id], time_start=ticket_begin_at, time_stop=ticket_end_at)
     # Python
     if not message_records:
         return msgs
