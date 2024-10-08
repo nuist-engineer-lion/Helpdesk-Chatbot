@@ -1,4 +1,5 @@
 from nonebot import require, get_bot
+from nonebot.rule import Rule
 from nonebot import get_plugin_config, on_message, on_command
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent
 from nonebot.plugin import PluginMetadata
@@ -13,6 +14,7 @@ cst = timezone('Asia/Shanghai')
 
 from .config import Config
 from .model import Ticket
+from .utils import send_forward_msg, print_ticket_info
 
 from nonebot import require
 
@@ -29,22 +31,30 @@ __plugin_meta__ = PluginMetadata(
 
 config = get_plugin_config(Config)
 
+# 写一个将函数转换为Rule对象的装饰器
+def rule(func):
+    return Rule(func)
+
 # 定义规则
 async def is_engineer(event: MessageEvent) -> bool:
+    if isinstance(event, GroupMessageEvent):
+        return event.group_id == config.notify_group
     return event.get_user_id() in config.engineers
 
 async def is_customer(event: PrivateMessageEvent) -> bool:
     return await is_engineer(event) is False
 
-# 是否是通知群内人员
-async def is_notify_group(event: GroupMessageEvent) -> bool:
-    return event.group_id == int(config.notify_group)
-
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
-get_alive_ticket_matcher = on_command("alive", rule=is_notify_group | is_engineer, aliases={"活跃工单", "工单"}, priority=10, block=True)
-
+get_alive_ticket_matcher = on_command("alive", rule=is_engineer, aliases={"活跃工单", "工单"}, priority=10, block=True)
+get_pending_ticket_matcher = on_command("pending", rule=is_engineer, aliases={"未接工单"}, priority=10, block=True)
+get_all_ticket_matcher = on_command("all", rule=is_engineer, aliases={"所有工单"}, priority=10, block=True)
+get_my_alive_ticket_matcher = on_command("my", rule=is_engineer, aliases={"我的工单"}, priority=10, block=True)
+get_my_all_ticket_matcher = on_command("myall", rule=is_engineer, aliases={"我的所有工单"}, priority=10, block=True)
+take_ticket_matcher = on_command("take", rule=is_engineer, aliases={"接单"}, priority=10, block=True)
+untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"}, priority=10, block=True)
+close_ticket_matcher = on_command("close", rule=is_engineer, aliases={"关闭工单"}, priority=10, block=True)
 
 # 回复客户消息
 @customer_message.handle()
@@ -81,47 +91,6 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     engineer_id = event.get_user_id()
     plain_message = event.get_plaintext()
-    if "all" in plain_message:
-        # 获取所有未处理的工单
-        tickets = await session.execute(select(Ticket).filter(Ticket.status != 'closed'))
-        tickets = tickets.scalars().all()
-        if not tickets:
-            await engineer_message.finish("没有工单！")
-        for ticket in tickets:
-            await sleep(1)
-            await engineer_message.send(f"工单id:{ticket.id}\n用户id:{ticket.customer_id}\n工程师id:{ticket.engineer_id}\n创建时间:{ticket.begin_at}\n状态:{ticket.status}")
-    elif "my" in plain_message:
-        # 获取工程师的工单
-        ticket = await session.execute(select(Ticket).filter(Ticket.engineer_id == engineer_id, Ticket.status == 'processing'))
-        ticket = ticket.scalars().all()
-        if not ticket:
-            await engineer_message.finish("没有工单！")
-        for ticket in ticket:
-            await sleep(1)
-            await engineer_message.send(f"工单id:{ticket.id}\n用户id:{ticket.customer_id}\n工程师id:{ticket.engineer_id}\n创建时间:{ticket.begin_at}\n状态:{ticket.status}")
-    elif "take" in plain_message:
-        # 接单
-        ticket_id = int(plain_message.split(" ")[-1])
-        ticket = await session.execute(select(Ticket).filter(Ticket.id == ticket_id))
-        ticket = ticket.scalars().first()
-        if ticket is not None and ticket.status == 'processing':
-            ticket.engineer_id = engineer_id
-            await session.commit()
-            await engineer_message.finish("接单成功！")
-        else:
-            await engineer_message.finish("接单失败！")
-    elif "close" in plain_message:
-        # 关闭工单
-        ticket_id = int(plain_message.split(" ")[-1])
-        ticket = await session.execute(select(Ticket).filter(Ticket.id == ticket_id))
-        ticket = ticket.scalars().first()
-        if ticket is not None:
-            ticket.status = 'closed'
-            ticket.end_at = datetime.fromtimestamp(event.time, cst)
-            await session.commit()
-            await engineer_message.finish("关闭工单成功！")
-        else:
-            await engineer_message.finish("关闭工单失败！")
 
 @scheduler.scheduled_job(trigger="interval", seconds=config.ticket_checking_interval)
 async def ticket_check():
@@ -132,19 +101,23 @@ async def ticket_check():
         tickets = await session.execute(select(Ticket).filter(Ticket.status == 'creating', Ticket.creating_expired_at < datetime.now()))
         tickets = tickets.scalars().all()
         for ticket in tickets:
+            ticket_id = ticket.id
             # 将工单状态更新为pending
             ticket.status = 'pending'
             await session.commit()
             # 转发消息给通知群
+            await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=config.notify_group)
             await bot.send_group_msg(group_id=config.notify_group, message=config.new_ticket_notify)
     # 筛选出所有处于alarming但是已经过期的工单
     async with session.begin():
         tickets = await session.execute(select(Ticket).filter(Ticket.status == 'alarming', Ticket.alarming_expired_at < datetime.now()))
         tickets = tickets.scalars().all()
         for ticket in tickets:
+            ticket_id = ticket.id
             # 将工单状态更新为pending
             ticket.status = 'pending'
             await session.commit()
             # 转发消息给通知群
+            await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=config.notify_group)
             await bot.send_group_msg(group_id=config.notify_group, message=config.alarm_ticket_notify)
             

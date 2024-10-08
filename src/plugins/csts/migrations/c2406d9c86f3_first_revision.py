@@ -1,8 +1,8 @@
 """first revision
 
-迁移 ID: 8e5d6f386552
+迁移 ID: c2406d9c86f3
 父迁移: 
-创建时间: 2024-10-08 10:41:18.081657
+创建时间: 2024-10-08 14:51:18.777662
 
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '8e5d6f386552'
+revision: str = 'c2406d9c86f3'
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = ('csts',)
 depends_on: str | Sequence[str] | None = None
