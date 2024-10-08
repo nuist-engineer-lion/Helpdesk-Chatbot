@@ -1,6 +1,6 @@
 from nonebot import require, get_bot
-from nonebot import get_plugin_config, on_message
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent
+from nonebot import get_plugin_config, on_message, on_command
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me
 from datetime import datetime, timedelta, UTC
@@ -36,9 +36,15 @@ async def is_engineer(event: MessageEvent) -> bool:
 async def is_customer(event: PrivateMessageEvent) -> bool:
     return await is_engineer(event) is False
 
+# 是否是通知群内人员
+async def is_notify_group(event: GroupMessageEvent) -> bool:
+    return event.group_id == int(config.notify_group)
+
 # 定义响应器
-customer_message = on_message(rule=is_customer & to_me())
-engineer_message = on_message(rule=is_engineer & to_me())
+customer_message = on_message(rule=is_customer & to_me(), priority=100)
+engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
+get_alive_ticket_matcher = on_command("alive", rule=is_notify_group | is_engineer, aliases={"活跃工单", "工单"}, priority=10, block=True)
+
 
 # 回复客户消息
 @customer_message.handle()
@@ -63,17 +69,14 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         # 更新工单的报警过期时间
         ticket.alarming_expired_at = datetime.now() + timedelta(seconds=config.ticket_alarming_alive_time)
         await session.commit()
+    elif ticket.status == 'pending': # 如果没有工程师接单，设置为催单状态
+        ticket.status = 'alarming'
+        ticket.alarming_expired_at = datetime.now() + timedelta(seconds=config.ticket_alarming_alive_time)
+        await session.commit()
     elif ticket.status == 'processing':
-        # 如果没有工程师接单，设置为催单状态
-        if ticket.engineer_id is None:
-            ticket.status = 'alarming'
-            ticket.alarming_expired_at = datetime.now() + timedelta(seconds=config.ticket_alarming_alive_time)
-            await session.commit()
-        else:
-            # 转发消息给工程师
-            await bot.send_private_msg(user_id=ticket.engineer_id, message=event.message)
+        # 转发消息给工程师
+        await bot.send_private_msg(user_id=ticket.engineer_id, message=event.message)
 
-# 回复工程师消息
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     engineer_id = event.get_user_id()
@@ -120,7 +123,7 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
         else:
             await engineer_message.finish("关闭工单失败！")
 
-@scheduler.scheduled_job("cron", minute="*/1", id="ticket_check")
+@scheduler.scheduled_job(trigger="interval", seconds=config.ticket_checking_interval)
 async def ticket_check():
     bot = get_bot()
     session = get_session()
@@ -129,19 +132,19 @@ async def ticket_check():
         tickets = await session.execute(select(Ticket).filter(Ticket.status == 'creating', Ticket.creating_expired_at < datetime.now()))
         tickets = tickets.scalars().all()
         for ticket in tickets:
-            # 将工单状态更新为processing
-            ticket.status = 'processing'
+            # 将工单状态更新为pending
+            ticket.status = 'pending'
             await session.commit()
             # 转发消息给通知群
-            await bot.send_group_msg(group_id=config.notify_group, message=f"[CQ:at,qq=all] 有新工单，请尽快处理！")
+            await bot.send_group_msg(group_id=config.notify_group, message=config.new_ticket_notify)
     # 筛选出所有处于alarming但是已经过期的工单
     async with session.begin():
         tickets = await session.execute(select(Ticket).filter(Ticket.status == 'alarming', Ticket.alarming_expired_at < datetime.now()))
         tickets = tickets.scalars().all()
         for ticket in tickets:
-            # 将工单状态更新为processing
-            ticket.status = 'processing'
+            # 将工单状态更新为pending
+            ticket.status = 'pending'
             await session.commit()
             # 转发消息给通知群
-            await bot.send_group_msg(group_id=config.notify_group, message=f"[CQ:at,qq=all] 用户在催单啦！请尽快处理！")
+            await bot.send_group_msg(group_id=config.notify_group, message=config.alarm_ticket_notify)
             

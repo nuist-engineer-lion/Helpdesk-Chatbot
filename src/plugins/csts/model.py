@@ -10,7 +10,7 @@ class Ticket(Model):
     customer_id = Column(String)
     engineer_id = Column(String, nullable=True)
 
-    status = Column(String,default="creating")# creating, processing, alarming, closed
+    status = Column(String,default="creating")# creating, pending, processing, alarming, closed
     
     begin_at = Column(DateTime)
     end_at = Column(DateTime, nullable=True)
