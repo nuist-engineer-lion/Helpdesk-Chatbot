@@ -78,8 +78,8 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
     for i, record in enumerate(message_records):
         if i == 0 or record.type != message_records[i-1].type:
             if record.type == "message_sent":
-                msgs.append(Message("~~~~~Engineer~~~~~"))
+                msgs.append(Message("~~~~~~~Engineer~~~~~~~"))
             else:
-                msgs.append(Message("-----Customer-----"))
+                msgs.append(Message("---------Customer---------"))
         msgs.append(record.message)
     return msgs

@@ -92,7 +92,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         await send_forward_msg(
             bot, 
             [
-                Message("接收到来自以下客户的消息" + "" if is_focus else f"，请先focus此工单{ticket.id}后回复" + "!"),
+                Message("接收到来自以下客户的消息" + ("" if is_focus else f"，请先focus此工单 {ticket.id:0>3} 后回复") + "！"),
                 Message(f"[CQ:contact,type=qq,id={customer_id}]"), 
                 event.message
             ], 
@@ -138,7 +138,7 @@ async def ticket_check():
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     engineer_id = event.get_user_id()
     if engineer_id not in focus_ticket_map:
-        engineer_message.finish("您未focus任何工单！可用指令列表：[alive|pending|all|my|myall|take|untake|close|focus|unfocus]")
+        await engineer_message.finish("您未focus任何工单！可用指令列表：[alive|pending|all|my|myall|take|untake|close|focus|unfocus]")
     else:
         ticket_id = focus_ticket_map[engineer_id]
         ticket = await session.get(Ticket, ticket_id)
@@ -213,8 +213,10 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     customer_id = ticket.customer_id
     await session.commit()
     # 通知客户
-    await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！[CQ:contact,type=qq,id={engineer_id}]")
-    await take_ticket_matcher.finish(f"接单成功！如需与客户沟通，可先focus此工单后直接回复我，我会将消息转发给客户！也可以添加客户为好友！[CQ:contact,type=qq,id={customer_id}]")
+    await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！")
+    await bot.send_private_msg(user_id=customer_id, message=f"[CQ:contact,type=qq,id={engineer_id}]")
+    await take_ticket_matcher.send(f"接单成功！如需与客户沟通，可先focus此工单后直接回复我，我会将消息转发给客户！也可以添加客户为好友！")
+    await take_ticket_matcher.finish(Message(f"[CQ:contact,type=qq,id={customer_id}]"))
 
 @untake_ticket_matcher.handle()
 async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
@@ -227,12 +229,16 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
         await untake_ticket_matcher.finish("您未接单或不是该工单的工程师")
     ticket.status = 'pending'
     ticket.engineer_id = None
+    customer_id = ticket.customer_id
     await session.commit()
+    # 检查focus列表，如果有工程师focus此工单，则自动unfocus
+    if focus_ticket_map.get(engineer_id) == ticket_id:
+        focus_ticket_map.pop(engineer_id)
     # 通知客户
-    await bot.send_private_msg(user_id=ticket.customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
+    await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
     await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=config.notify_group)
-    await bot.send_group_msg(group_id=config.notify_group, message=f"工程师{engineer_id}有事暂时无法处理工单{ticket_id}，工单已重新进入待接单状态！")
+    await bot.send_group_msg(group_id=config.notify_group, message=f"工程师{engineer_id}有事暂时无法处理工单 {ticket_id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
 
 @close_ticket_matcher.handle()
