@@ -52,29 +52,31 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
     msgs = []
     async with session.begin():
         ticket = await session.get(Ticket, ticket_id)
-        msgs.append(Message(f"工单号: {ticket.id:0>3}"))
-        msgs.append(Message(f"状态: {ticket.status}"))
-        msgs.append(Message("创建时间: " + ticket.begin_at.strftime("%Y-%m-%d %H:%M:%S")))
-        if ticket.end_at:
-            msgs.append(Message("结束时间: " + ticket.end_at.strftime("%Y-%m-%d %H:%M:%S")))
-        msgs.append(Message(f"机主名片[CQ:contact,type=qq,id={ticket.customer_id}]"))
-        if ticket.engineer_id:
-            msgs.append(Message(f"工程师名片[CQ:contact,type=qq,id={ticket.engineer_id}]"))
-        # 下面打印历史消息
-        message_records = await get_message_records(id1s=[ticket.customer_id], time_start=ticket.begin_at - timedelta(hours=8), time_stop=None if ticket.end_at is None else ticket.end_at - timedelta(hours=8))
-        print(message_records)
-        if not message_records:
-            return msgs
-        if message_records[0].type == "message_sent":
-            msgs.append(Message("~~~~~Engineer~~~~~"))
-        else:
-            msgs.append(Message("-----Customer-----"))
-        msgs.append(message_records[0].message)
-        for i in range(1, len(message_records)):
-            if message_records[i].type != message_records[i-1].type:
-                if message_records[i].type == "message_sent":
-                    msgs.append(Message("~~~~~Engineer~~~~~"))
-                else:
-                    msgs.append(Message("-----Customer-----"))
-            msgs.append(message_records[i].message)
+        ticket_id = ticket.id
+        ticket_status = ticket.status
+        ticket_begin_at = ticket.begin_at
+        ticket_end_at = ticket.end_at
+        ticket_customer_id = ticket.customer_id
+        ticket_engineer_id = ticket.engineer_id
+    msgs.append(Message(f"工单号: {ticket_id:0>3}"))
+    msgs.append(Message(f"状态: {ticket_status}"))
+    msgs.append(Message("创建时间: " + ticket_begin_at.strftime("%Y-%m-%d %H:%M:%S")))
+    if ticket_end_at:
+        msgs.append(Message("结束时间: " + ticket_end_at.strftime("%Y-%m-%d %H:%M:%S")))
+    msgs.append(Message(f"机主名片[CQ:contact,type=qq,id={ticket_customer_id}]"))
+    if ticket_engineer_id:
+        msgs.append(Message(f"工程师名片[CQ:contact,type=qq,id={ticket_engineer_id}]"))
+    # 下面打印历史消息
+    message_records = await get_message_records(id1s=[ticket_customer_id], time_start=ticket_begin_at - timedelta(hours=8), time_stop=None if ticket_end_at is None else ticket_end_at - timedelta(hours=8))
+    # Python
+    if not message_records:
         return msgs
+    
+    for i, record in enumerate(message_records):
+        if i == 0 or record.type != message_records[i-1].type:
+            if record.type == "message_sent":
+                msgs.append(Message("~~~~~Engineer~~~~~"))
+            else:
+                msgs.append(Message("-----Customer-----"))
+        msgs.append(record.message)
+    return msgs
