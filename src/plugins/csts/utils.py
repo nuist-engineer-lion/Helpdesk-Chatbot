@@ -1,4 +1,6 @@
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, Message
+from typing import Optional
+from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent, Message, GroupMessageEvent
+from nonebot.internal.adapter.bot import Bot
 from .model import Ticket
 from nonebot import require
 require("nonebot_plugin_chatrecorder")
@@ -12,9 +14,9 @@ cst = timezone('Asia/Shanghai')
 async def send_forward_msg(
         bot: Bot,
         msgs: list[Message],
-        event: MessageEvent = None,
-        target_group_id: str = None,
-        target_user_id: str = None,
+        event: Optional[MessageEvent] = None,
+        target_group_id: Optional[str|int] = None,
+        target_user_id: Optional[str|int] = None,
         block_event: bool = False,
 ):
     """
@@ -40,12 +42,11 @@ async def send_forward_msg(
             "send_private_forward_msg", user_id=target_user_id, messages=messages
         )
     if not block_event and event:
-        is_private = isinstance(event, PrivateMessageEvent)
-        if(is_private):
+        if isinstance(event, PrivateMessageEvent) :
             await bot.call_api(
                 "send_private_forward_msg", user_id=event.user_id, messages=messages
             )
-        else:
+        elif isinstance(event,GroupMessageEvent):
             await bot.call_api(
                 "send_group_forward_msg", group_id=event.group_id, messages=messages
             )
@@ -55,6 +56,9 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
     msgs = []
     async with session.begin():
         ticket = await session.get(Ticket, ticket_id)
+        if not ticket:
+            # no ticket record
+            raise(ValueError)
         ticket_id = ticket.id
         ticket_status = ticket.status
         ticket_begin_at = cst.localize(ticket.begin_at)
