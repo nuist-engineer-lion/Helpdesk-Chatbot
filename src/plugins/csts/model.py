@@ -1,22 +1,22 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.orm import Mapped,mapped_column
 from datetime import datetime
 from nonebot import require
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import Model
 
 class Ticket(Model):
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id:Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    customer_id = Column(String)
-    engineer_id = Column(String, nullable=True)
+    customer_id:Mapped[str]
+    engineer_id:Mapped[str|None] = mapped_column(nullable=True)
 
-    status = Column(String,default="creating")# creating, pending, processing, alarming, closed
+    status:Mapped[str] = mapped_column(default="creating")# creating, pending, processing, alarming, closed
     
-    begin_at = Column(DateTime)
-    end_at = Column(DateTime, nullable=True)
+    begin_at:Mapped[datetime]
+    end_at:Mapped[datetime|None] = mapped_column(nullable=True)
     
-    creating_expired_at = Column(DateTime)
-    alarming_expired_at = Column(DateTime, nullable=True)
+    creating_expired_at:Mapped[datetime]
+    alarming_expired_at:Mapped[datetime|None] = mapped_column(nullable=True)
     
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, onupdate=datetime.now)
+    created_at:Mapped[datetime] = mapped_column(default=datetime.now)
+    updated_at:Mapped[datetime] = mapped_column(onupdate=datetime.now)
