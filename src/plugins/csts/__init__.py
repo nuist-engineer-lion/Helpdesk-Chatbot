@@ -1,9 +1,9 @@
-from nonebot import get_bots, logger, require, get_bot
+from nonebot import get_bots, logger, on_shell_command, require, get_bot
 from nonebot.rule import Rule
 from nonebot import get_plugin_config, on_message, on_command
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
 from nonebot.plugin import PluginMetadata
-from nonebot.rule import to_me
+from nonebot.rule import to_me,ArgumentParser
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta, UTC
 from nonebot_plugin_orm import async_scoped_session, get_session
@@ -151,6 +151,7 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             await session.commit()
+            await session.refresh(ticket)
             # 转发消息给通知群
             await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
@@ -253,10 +254,11 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     ticket.status = Status.PROCESSING
     ticket.engineer_id = engineer_id
     await session.commit()
+    await session.refresh(ticket)
     # 通知客户
     await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！")
     await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"[CQ:contact,type=qq,id={engineer_id}]")
-    await take_ticket_matcher.send(f"接单成功！如需与客户沟通，可先focus此工单后直接回复我，我会将消息转发给客户！也可以添加客户为好友！")
+    await take_ticket_matcher.send(f"接单成功！请添加客户为好友！解决后及时关单！")
     await take_ticket_matcher.finish(Message(f"[CQ:contact,type=qq,id={ticket.customer_id}]"))
 
 @untake_ticket_matcher.handle()
@@ -294,6 +296,7 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
     ticket.status = Status.CLOSED
     ticket.end_at = datetime.fromtimestamp(event.time, cst)
     await session.commit()
+    await session.refresh(ticket)
     await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
     # 通知客户
     await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，工单已关闭！")
