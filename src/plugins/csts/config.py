@@ -6,7 +6,7 @@ class Config(BaseModel):
     notify_group: str|int
     engineers: List[str|int]
     
-    recive_bot: str|int|None = None
+    receive_bot: str|int|None = None
     send_bot: str|int|None = None
     
     ticket_creating_alive_time: int = 60 # 秒，工单创建过程的生存期（最新消息后过该时间则完成工单创建）

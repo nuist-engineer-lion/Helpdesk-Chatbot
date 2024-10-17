@@ -39,17 +39,17 @@ def get_send_bot(bot):
         return bot
 
 # 定义规则
-def is_reciver(event:MessageEvent) -> bool:
-    if not plugin_config.recive_bot:
+def is_receiver(event:MessageEvent) -> bool:
+    if not plugin_config.receive_bot:
         return True
-    if event.self_id == int(plugin_config.recive_bot):
+    if event.self_id == int(plugin_config.receive_bot):
         return True
     return False
 
 async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的人员为工程师
     if event.get_user_id() in get_bots():
         return False
-    if is_reciver(event):
+    if is_receiver(event):
         if isinstance(event, GroupMessageEvent):
             return event.group_id == plugin_config.notify_group
         return event.get_user_id() in plugin_config.engineers
@@ -59,7 +59,7 @@ async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的�
 async def is_customer(event: PrivateMessageEvent) -> bool:
     if event.get_user_id() in get_bots():
         return False
-    if is_reciver(event):
+    if is_receiver(event):
         return await is_engineer(event) is False
     else:
         return False
@@ -133,9 +133,9 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
 
 @scheduler.scheduled_job(trigger="interval", seconds=plugin_config.ticket_checking_interval)
 async def ticket_check():
-    if not plugin_config.recive_bot:
+    if not plugin_config.receive_bot:
         # 私聊客户还是用公号
-        bot = get_bot(str(plugin_config.recive_bot))
+        bot = get_bot(str(plugin_config.receive_bot))
     else:
         bot = get_bot()
     # 发通知用发通知的号
