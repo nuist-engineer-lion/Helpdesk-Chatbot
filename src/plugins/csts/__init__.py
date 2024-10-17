@@ -66,10 +66,10 @@ get_my_all_ticket_matcher = on_command("myall", rule=is_engineer, aliases={"我�
 take_ticket_matcher = on_command("take", rule=is_engineer, aliases={"接单"}, priority=10, block=True)
 untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"}, priority=10, block=True)
 close_ticket_matcher = on_command("close", rule=is_engineer, aliases={"关闭工单"}, priority=10, block=True)
-focus_ticket_matcher = on_command("focus", rule=is_engineer, aliases={"关注工单"}, priority=10, block=True)
-unfocus_ticket_matcher = on_command("unfocus", rule=is_engineer, aliases={"取消关注工单"}, priority=10, block=True)
+# focus_ticket_matcher = on_command("focus", rule=is_engineer, aliases={"关注工单"}, priority=10, block=True)
+# unfocus_ticket_matcher = on_command("unfocus", rule=is_engineer, aliases={"取消关注工单"}, priority=10, block=True)
 
-focus_ticket_map = {}
+# focus_ticket_map = {}
 
 # 回复客户消息
 @customer_message.handle()
@@ -101,13 +101,13 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         ticket.alarming_expired_at = datetime.now() + timedelta(seconds=plugin_config.ticket_alarming_alive_time)
         await session.commit()
         await bot.call_api("set_input_status", user_id=customer_id)
-    elif ticket.status == 'processing':
+    elif ticket.status == Status.PROCESSING:
         # 转发消息给工程师
-        is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
+        # is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
         await send_forward_msg(
-            bot, 
+            get_send_bot(bot), 
             [
-                Message("接收到来自以下客户的消息" + ("" if is_focus else f"，请先focus此工单 {ticket.id:0>3} 后回复") + "！"),
+                Message("接收到来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),
                 Message(f"[CQ:contact,type=qq,id={customer_id}]"), 
                 event.message
             ], 
@@ -153,15 +153,16 @@ async def ticket_check():
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     engineer_id = event.get_user_id()
-    if engineer_id not in focus_ticket_map:
-        await engineer_message.finish("您未focus任何工单！可用指令列表：[alive|pending|all|my|myall|take|untake|close|focus|unfocus]")
-    else:
-        ticket_id = focus_ticket_map[engineer_id]
-        ticket = await session.get(Ticket, ticket_id)
-        if not ticket:
-            # no ticket record
-            raise(ValueError)
-        await bot.send_private_msg(user_id=int(ticket.customer_id), message=event.message) # 转发消息给客户
+    await engineer_message.finish(f"你好 qq号是{engineer_id}的 bro")
+    # if engineer_id not in focus_ticket_map:
+    #     await engineer_message.finish("您未focus任何工单！可用指令列表：[alive|pending|all|my|myall|take|untake|close|focus|unfocus]")
+    # else:
+    #     ticket_id = focus_ticket_map[engineer_id]
+    #     ticket = await session.get(Ticket, ticket_id)
+    #     if not ticket:
+    #         # no ticket record
+    #         raise(ValueError)
+    #     await bot.send_private_msg(user_id=int(ticket.customer_id), message=event.message) # 转发消息给客户
 
 @get_alive_ticket_matcher.handle()
 async def get_alive_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
@@ -249,9 +250,9 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     ticket.engineer_id = None
     customer_id = int(ticket.customer_id)
     await session.commit()
-    # 检查focus列表，如果有工程师focus此工单，则自动unfocus
-    if focus_ticket_map.get(engineer_id) == ticket_id:
-        focus_ticket_map.pop(engineer_id)
+    # # 检查focus列表，如果有工程师focus此工单，则自动unfocus
+    # if focus_ticket_map.get(engineer_id) == ticket_id:
+    #     focus_ticket_map.pop(engineer_id)
     # 通知客户
     await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
@@ -278,23 +279,23 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
     await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完工单{ticket_id}，工单已关闭！")
     await close_ticket_matcher.finish("关闭工单成功！")
 
-@focus_ticket_matcher.handle()
-async def focus_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
-    engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args, focus_ticket_matcher)
-    ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
-        await focus_ticket_matcher.finish("工单不存在")
-    if ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
-        await focus_ticket_matcher.finish("您未接单或不是该工单的工程师")
-    focus_ticket_map[engineer_id] = ticket_id
-    await session.commit()
-    await focus_ticket_matcher.finish("focus成功！接下啦请直接回复我，我会将消息转发给客户！")
+# @focus_ticket_matcher.handle()
+# async def focus_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+#     engineer_id = event.get_user_id()
+#     ticket_id = await validate_ticket_id(args, focus_ticket_matcher)
+#     ticket = await session.get(Ticket, ticket_id)
+#     if ticket is None:
+#         await focus_ticket_matcher.finish("工单不存在")
+#     if ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
+#         await focus_ticket_matcher.finish("您未接单或不是该工单的工程师")
+#     focus_ticket_map[engineer_id] = ticket_id
+#     await session.commit()
+#     await focus_ticket_matcher.finish("focus成功！接下啦请直接回复我，我会将消息转发给客户！")
 
-@unfocus_ticket_matcher.handle()
-async def unfocus_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    engineer_id = event.get_user_id()
-    if focus_ticket_map.get(engineer_id) is None:
-        await unfocus_ticket_matcher.finish("您未focus任何工单")
-    focus_ticket_map.pop(engineer_id)
-    await unfocus_ticket_matcher.finish("unfocus成功！")
+# @unfocus_ticket_matcher.handle()
+# async def unfocus_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
+#     engineer_id = event.get_user_id()
+#     if focus_ticket_map.get(engineer_id) is None:
+#         await unfocus_ticket_matcher.finish("您未focus任何工单")
+#     focus_ticket_map.pop(engineer_id)
+#     await unfocus_ticket_matcher.finish("unfocus成功！")
