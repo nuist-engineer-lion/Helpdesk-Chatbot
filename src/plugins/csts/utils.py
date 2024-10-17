@@ -1,8 +1,10 @@
 from typing import Optional
 from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent, Message, GroupMessageEvent
 from nonebot.internal.adapter.bot import Bot
+
+from .config import Config
 from .model import Ticket
-from nonebot import require
+from nonebot import get_plugin_config, require
 require("nonebot_plugin_chatrecorder")
 from nonebot_plugin_chatrecorder import get_message_records
 from nonebot_plugin_orm import get_session
@@ -10,6 +12,8 @@ from datetime import datetime
 # 获取中国时区
 from pytz import timezone
 cst = timezone('Asia/Shanghai')
+
+plugin_config = get_plugin_config(Config)
 
 async def send_forward_msg(
         bot: Bot,
@@ -74,7 +78,11 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
     if ticket_engineer_id:
         msgs.append(Message(f"工程师名片[CQ:contact,type=qq,id={ticket_engineer_id}]"))
     # 下面打印历史消息
-    message_records = await get_message_records(id1s=[ticket_customer_id], time_start=ticket_begin_at, time_stop=ticket_end_at)
+    if plugin_config.recive_bot:
+        bot_id = [str(plugin_config.recive_bot)]
+    else:
+        bot_id = None
+    message_records = await get_message_records(id1s=[ticket_customer_id], time_start=ticket_begin_at, time_stop=ticket_end_at, id2s=[''], bot_ids=bot_id)
     # Python
     if not message_records:
         return msgs
