@@ -27,4 +27,4 @@ class Ticket(Model):
     alarming_expired_at:Mapped[datetime|None] = mapped_column(nullable=True)
     
     created_at:Mapped[datetime] = mapped_column(default=datetime.now)
-    updated_at:Mapped[datetime] = mapped_column(onupdate=datetime.now)
+    updated_at:Mapped[datetime] = mapped_column(default=datetime.now,onupdate=datetime.now)

@@ -1,4 +1,4 @@
-from nonebot import require, get_bot
+from nonebot import get_bots, logger, require, get_bot
 from nonebot.rule import Rule
 from nonebot import get_plugin_config, on_message, on_command
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
@@ -47,13 +47,22 @@ def is_reciver(event:MessageEvent) -> bool:
     return False
 
 async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的人员为工程师
+    if event.get_user_id() in get_bots():
+        return False
     if is_reciver(event):
         if isinstance(event, GroupMessageEvent):
             return event.group_id == plugin_config.notify_group
-    return event.get_user_id() in plugin_config.engineers
+        return event.get_user_id() in plugin_config.engineers
+    else:
+        return False
 
 async def is_customer(event: PrivateMessageEvent) -> bool:
-    return await is_engineer(event) is False
+    if event.get_user_id() in get_bots():
+        return False
+    if is_reciver(event):
+        return await is_engineer(event) is False
+    else:
+        return False
 
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
@@ -84,8 +93,12 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         ticket = Ticket(customer_id=customer_id, begin_at=datetime.fromtimestamp(event.time, cst), creating_expired_at=datetime.now() + timedelta(seconds=plugin_config.ticket_creating_alive_time))
         session.add(ticket)
         await session.commit()
+        logger.info("创建工单已经提交到数据库")
         # 延时n秒，用于模拟工程师接单
-        await bot.call_api("set_input_status", user_id=customer_id)
+        try:
+            await bot.call_api("set_input_status", user_id=customer_id)
+        except:
+            logger.warning("不支持set_input_status api")
         await sleep(plugin_config.first_reply_delay)
         await customer_message.send(plugin_config.first_reply)
     elif ticket.status == Status.CREATING:
@@ -100,7 +113,11 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         ticket.status = Status.ALARMING
         ticket.alarming_expired_at = datetime.now() + timedelta(seconds=plugin_config.ticket_alarming_alive_time)
         await session.commit()
-        await bot.call_api("set_input_status", user_id=customer_id)
+        logger.info("发生催单")
+        try:
+            await bot.call_api("set_input_status", user_id=customer_id)
+        except:
+            logger.warning("不支持set_input_status api")
     elif ticket.status == Status.PROCESSING:
         # 转发消息给工程师
         # is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
@@ -116,7 +133,12 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
 
 @scheduler.scheduled_job(trigger="interval", seconds=plugin_config.ticket_checking_interval)
 async def ticket_check():
-    bot = get_bot()
+    if not plugin_config.recive_bot:
+        # 私聊客户还是用公号
+        bot = get_bot(str(plugin_config.recive_bot))
+    else:
+        bot = get_bot()
+    # 发通知用发通知的号
     send_bot = get_send_bot(bot)
     session = get_session()
     # 筛选出所有处于creating但是已经过期的工单
@@ -153,9 +175,9 @@ async def ticket_check():
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     engineer_id = event.get_user_id()
-    await engineer_message.finish(f"你好 qq号是{engineer_id}的 bro")
+    # await engineer_message.finish(f"你好 qq号是{engineer_id}的 bro")
     # if engineer_id not in focus_ticket_map:
-    #     await engineer_message.finish("您未focus任何工单！可用指令列表：[alive|pending|all|my|myall|take|untake|close|focus|unfocus]")
+    await engineer_message.finish("可用指令列表：[alive|pending|all|my|myall|take|untake|close]")
     # else:
     #     ticket_id = focus_ticket_map[engineer_id]
     #     ticket = await session.get(Ticket, ticket_id)

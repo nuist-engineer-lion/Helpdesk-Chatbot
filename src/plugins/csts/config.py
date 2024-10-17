@@ -13,8 +13,8 @@ class Config(BaseModel):
     ticket_alarming_alive_time: int = 20 # 秒，工单报警过程的生存期（最新消息后过该时间则进行工单报警）
     ticket_checking_interval: int = 30 # 秒，工单检查间隔
 
-    new_ticket_notify: str = "[CQ:at,qq=all] 有新工单，请尽快处理！" # 新工单通知消息
-    alarm_ticket_notify: str = "[CQ:at,qq=all] 用户在催单啦！请尽快处理！"# 工单报警通知消息
+    new_ticket_notify: str = "有新工单，请尽快处理！" # 新工单通知消息
+    alarm_ticket_notify: str = "用户在催单啦！请尽快处理！"# 工单报警通知消息
 
     first_reply: str = "您好，欢迎联系咨询，请详细描述您的问题，我们会尽快为您解答。"# 第一次回复消息
     first_reply_delay: int = 5 # 秒，第一次回复延迟时间
