@@ -32,10 +32,24 @@ __plugin_meta__ = PluginMetadata(
 
 plugin_config = get_plugin_config(Config)
 
+def get_send_bot(bot):
+    if plugin_config.send_bot:
+        return get_bot(str(plugin_config.send_bot))
+    else:
+        return bot
+
 # 定义规则
+def is_reciver(event:MessageEvent) -> bool:
+    if not plugin_config.recive_bot:
+        return True
+    if event.self_id == int(plugin_config.recive_bot):
+        return True
+    return False
+
 async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的人员为工程师
-    if isinstance(event, GroupMessageEvent):
-        return event.group_id == plugin_config.notify_group
+    if is_reciver(event):
+        if isinstance(event, GroupMessageEvent):
+            return event.group_id == plugin_config.notify_group
     return event.get_user_id() in plugin_config.engineers
 
 async def is_customer(event: PrivateMessageEvent) -> bool:
@@ -61,6 +75,7 @@ focus_ticket_map = {}
 @customer_message.handle()
 async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: async_scoped_session):
     customer_id = event.get_user_id()
+    send_bot = get_send_bot(bot)
     # 根据客户id获取最新的未关闭工单
     ticket = await session.execute(select(Ticket).filter(Ticket.customer_id == customer_id, Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()).limit(1))
     ticket = ticket.scalars().first()
@@ -102,6 +117,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
 @scheduler.scheduled_job(trigger="interval", seconds=plugin_config.ticket_checking_interval)
 async def ticket_check():
     bot = get_bot()
+    send_bot = get_send_bot(bot)
     session = get_session()
     # 筛选出所有处于creating但是已经过期的工单
     async with session.begin():
@@ -113,11 +129,11 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             await session.commit()
-            # 转发消息给通知群和客户
-            await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group, target_user_id=ticket_customer_id)
+            # 转发消息给通知群
+            await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
         if tickets:
-            await bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
+            await send_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
     # 筛选出所有处于alarming但是已经过期的工单
     async with session.begin():
         tickets = await session.execute(select(Ticket).filter(Ticket.status == Status.ALARMING, Ticket.alarming_expired_at < datetime.now()))
@@ -130,9 +146,9 @@ async def ticket_check():
             await session.commit()
             # 转发消息给通知群
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
-            await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
+            await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
         if tickets:
-            await bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
+            await send_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
 
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
@@ -152,7 +168,7 @@ async def get_alive_ticket(bot: Bot, event: MessageEvent, session: async_scoped_
     tickets = await session.execute(select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()))
     tickets = tickets.scalars().all()
     for ticket in tickets:
-        await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
+        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
     if not tickets:
         await get_alive_ticket_matcher.finish("没有活跃工单")
 
@@ -161,7 +177,7 @@ async def get_pending_ticket(bot: Bot, event: MessageEvent, session: async_scope
     tickets = await session.execute(select(Ticket).filter(Ticket.status == Status.PENDING).order_by(Ticket.begin_at.desc()))
     tickets = tickets.scalars().all()
     for ticket in tickets:
-        await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
+        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
     if not tickets:
         await get_pending_ticket_matcher.finish("没有未接工单")
 
@@ -170,7 +186,7 @@ async def get_all_ticket(bot: Bot, event: MessageEvent, session: async_scoped_se
     tickets = await session.execute(select(Ticket).order_by(Ticket.begin_at.desc()))
     tickets = tickets.scalars().all()
     for ticket in tickets:
-        await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
+        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
     if not tickets:
         await get_all_ticket_matcher.finish("没有工单")
 
@@ -180,7 +196,7 @@ async def get_my_alive_ticket(bot: Bot, event: MessageEvent, session: async_scop
     tickets = await session.execute(select(Ticket).filter(Ticket.engineer_id == engineer_id, Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()))
     tickets = tickets.scalars().all()
     for ticket in tickets:
-        await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
+        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
     if not tickets:
         await get_my_alive_ticket_matcher.finish("没有您的活跃工单")
 
@@ -190,7 +206,7 @@ async def get_my_all_ticket(bot: Bot, event: MessageEvent, session: async_scoped
     tickets = await session.execute(select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(Ticket.begin_at.desc()))
     tickets = tickets.scalars().all()
     for ticket in tickets:
-        await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
+        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
     if not tickets:
         await get_my_all_ticket_matcher.finish("没有您的工单")
 
@@ -239,8 +255,8 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     # 通知客户
     await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {ticket_id:0>3} ，工单已重新进入待接单状态！")
+    await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
+    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {ticket_id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
 
 @close_ticket_matcher.handle()
@@ -255,11 +271,11 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
     ticket.status = Status.CLOSED
     ticket.end_at = datetime.fromtimestamp(event.time, cst)
     await session.commit()
-    await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group, target_user_id=ticket.customer_id)
+    await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
     # 通知客户
     await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，工单已关闭！")
     # 通知接单群
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完工单{ticket_id}，工单已关闭！")
+    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完工单{ticket_id}，工单已关闭！")
     await close_ticket_matcher.finish("关闭工单成功！")
 
 @focus_ticket_matcher.handle()
