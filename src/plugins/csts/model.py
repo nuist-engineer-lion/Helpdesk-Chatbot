@@ -11,6 +11,7 @@ class Status(Enum):
     PROCESSING = 2
     ALARMING = 3
     CLOSED = 4
+    SCHEDULED = 5
 
 class Ticket(Model):
     id:Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -25,6 +26,8 @@ class Ticket(Model):
     
     creating_expired_at:Mapped[datetime]
     alarming_expired_at:Mapped[datetime|None] = mapped_column(nullable=True)
+      
+    description:Mapped[str|None] = mapped_column(nullable=True)
     
     created_at:Mapped[datetime] = mapped_column(default=datetime.now)
     updated_at:Mapped[datetime] = mapped_column(default=datetime.now,onupdate=datetime.now)

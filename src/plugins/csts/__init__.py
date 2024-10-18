@@ -1,10 +1,11 @@
+from typing import Annotated
 from nonebot import get_bots, logger, on_shell_command, require, get_bot
 from nonebot.rule import Rule
 from nonebot import get_plugin_config, on_message, on_command
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
 from nonebot.plugin import PluginMetadata
-from nonebot.rule import to_me,ArgumentParser
-from nonebot.params import CommandArg
+from nonebot.rule import to_me,ArgumentParser,Namespace
+from nonebot.params import CommandArg,ShellCommandArgs
 from datetime import datetime, timedelta, UTC
 from nonebot_plugin_orm import async_scoped_session, get_session
 from sqlalchemy import select
@@ -64,6 +65,11 @@ async def is_customer(event: PrivateMessageEvent) -> bool:
     else:
         return False
 
+close_parser = ArgumentParser()
+close_parser.add_argument("id",help="工单号")
+close_parser.add_argument("-d",help="描述工单")
+close_parser.add_argument("-s",help="设为预定", action='store_true')
+
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
@@ -74,7 +80,7 @@ get_my_alive_ticket_matcher = on_command("my", rule=is_engineer, aliases={"我�
 get_my_all_ticket_matcher = on_command("myall", rule=is_engineer, aliases={"我的所有工单"}, priority=10, block=True)
 take_ticket_matcher = on_command("take", rule=is_engineer, aliases={"接单"}, priority=10, block=True)
 untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"}, priority=10, block=True)
-close_ticket_matcher = on_command("close", rule=is_engineer, aliases={"关闭工单"}, priority=10, block=True)
+close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_engineer, aliases={"关闭工单"}, priority=10, block=True)
 # focus_ticket_matcher = on_command("focus", rule=is_engineer, aliases={"关注工单"}, priority=10, block=True)
 # unfocus_ticket_matcher = on_command("unfocus", rule=is_engineer, aliases={"取消关注工单"}, priority=10, block=True)
 
@@ -150,13 +156,12 @@ async def ticket_check():
             ticket_customer_id = ticket.customer_id
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
-            await session.commit()
-            await session.refresh(ticket)
             # 转发消息给通知群
             await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
         if tickets:
             await send_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
+    
     # 筛选出所有处于alarming但是已经过期的工单
     async with session.begin():
         tickets = await session.execute(select(Ticket).filter(Ticket.status == Status.ALARMING, Ticket.alarming_expired_at < datetime.now()))
@@ -166,7 +171,6 @@ async def ticket_check():
             ticket_customer_id = ticket.customer_id
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
-            await session.commit()
             # 转发消息给通知群
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
             await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
@@ -234,8 +238,8 @@ async def get_my_all_ticket(bot: Bot, event: MessageEvent, session: async_scoped
     if not tickets:
         await get_my_all_ticket_matcher.finish("没有您的工单")
 
-async def validate_ticket_id(args: Message, matcher, error_message: str = "请输入正确的工单号") -> int:
-    arg = args.extract_plain_text().strip()
+async def validate_ticket_id(args: str, matcher, error_message: str = "请输入正确的工单号") -> int:
+    arg = args.strip()
     try:
         ticket_id = int(arg)
     except:
@@ -245,7 +249,7 @@ async def validate_ticket_id(args: Message, matcher, error_message: str = "请�
 @take_ticket_matcher.handle()
 async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args, take_ticket_matcher)
+    ticket_id = await validate_ticket_id(args.extract_plain_text(), take_ticket_matcher)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None:
         await take_ticket_matcher.finish("工单不存在")
@@ -264,7 +268,7 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
 @untake_ticket_matcher.handle()
 async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args, untake_ticket_matcher)
+    ticket_id = await validate_ticket_id(args.extract_plain_text(), untake_ticket_matcher)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None:
         await untake_ticket_matcher.finish("工单不存在")
@@ -285,23 +289,33 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     await untake_ticket_matcher.finish("放单成功！")
 
 @close_ticket_matcher.handle()
-async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Annotated[Namespace, ShellCommandArgs()]):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args, close_ticket_matcher)
+    ticket_id = await validate_ticket_id(args.id, close_ticket_matcher)
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None:
         await close_ticket_matcher.finish("工单不存在")
-    if ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
-        await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
-    ticket.status = Status.CLOSED
-    ticket.end_at = datetime.fromtimestamp(event.time, cst)
+    
+    # 任何工程师都可以设置为预定，预定后需要再次关单
+    if args.s:
+        ticket.status = Status.SCHEDULED
+    else:
+        if ticket.status == Status.SCHEDULED:
+            ticket.engineer_id=engineer_id
+        elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
+            await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
+        ticket.description = args.d
+        ticket.status = Status.CLOSED
+        ticket.end_at = datetime.fromtimestamp(event.time, cst)
+    
     await session.commit()
     await session.refresh(ticket)
+    
     await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
     # 通知客户
-    await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，工单已关闭！")
+    await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，，感谢您的信任和支持！")
     # 通知接单群
-    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完工单{ticket_id}，工单已关闭！")
+    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{ticket_id}！")
     await close_ticket_matcher.finish("关闭工单成功！")
 
 # @focus_ticket_matcher.handle()
