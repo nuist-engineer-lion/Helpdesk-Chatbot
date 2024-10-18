@@ -55,6 +55,17 @@ async def send_forward_msg(
                 "send_group_forward_msg", group_id=event.group_id, messages=messages
             )
 
+async def print_ticket(ticket_id: int) -> list[Message]:
+    session = get_session()
+    msgs = []
+    async with session.begin():
+        ticket = await session.get(Ticket, ticket_id)
+        if not ticket:
+            # no ticket record
+            raise(ValueError)
+        msgs.append(f"工单:{ticket.id}\n状态:{ticket.status}\n机主id:{ticket.customer_id}\n工程师id:{ticket.engineer_id}")
+    return msgs
+
 async def print_ticket_info(ticket_id: int) -> list[Message]:
     session = get_session()
     msgs = []

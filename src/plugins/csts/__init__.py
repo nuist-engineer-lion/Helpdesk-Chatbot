@@ -16,7 +16,7 @@ cst = timezone('Asia/Shanghai')
 
 from .config import Config
 from .model import Ticket,Status
-from .utils import send_forward_msg, print_ticket_info
+from .utils import send_forward_msg, print_ticket_info,print_ticket
 
 from nonebot import require
 
@@ -65,23 +65,28 @@ async def is_customer(event: PrivateMessageEvent) -> bool:
     else:
         return False
 
-close_parser = ArgumentParser()
+Types_Ticket={
+    "活动的":lambda id:select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
+    "未接的":lambda id:select(Ticket).filter(Ticket.status == Status.PENDING).order_by(Ticket.begin_at.desc()),
+    "我的":lambda engineer_id:select(Ticket).filter(Ticket.engineer_id == engineer_id, Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
+    "所有的":lambda id:select(Ticket).order_by(Ticket.begin_at.desc()),
+    "所有我的":lambda engineer_id:select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(Ticket.begin_at.desc())}
+
+close_parser = ArgumentParser(prog="close")
 close_parser.add_argument("id",help="工单号")
 close_parser.add_argument("-d",help="描述工单")
 close_parser.add_argument("-s",help="设为预定", action='store_true')
 
-list_parser = ArgumentParser()
-list_parser.add_argument("type",help="types: alive pending all myall scheduled")
+list_parser = ArgumentParser(prog="list")
+list_parser.add_argument("type",help=f"types:{ ' '.join([key for key in Types_Ticket]) }")
+list_parser.add_argument("-a",help="用消息转发显示完整接单过程",action='store_true')
+
+
 
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
-list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer, priority=10, block=True)
-get_alive_ticket_matcher = on_command("alive", rule=is_engineer, aliases={"活跃工单", "工单"}, priority=10, block=True)
-get_pending_ticket_matcher = on_command("pending", rule=is_engineer, aliases={"未接工单"}, priority=10, block=True)
-get_all_ticket_matcher = on_command("all", rule=is_engineer, aliases={"所有工单"}, priority=10, block=True)
-get_my_alive_ticket_matcher = on_command("my", rule=is_engineer, aliases={"我的工单"}, priority=10, block=True)
-get_my_all_ticket_matcher = on_command("myall", rule=is_engineer, aliases={"我的所有工单"}, priority=10, block=True)
+list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer, aliases={"列出"} , priority=10, block=True)
 take_ticket_matcher = on_command("take", rule=is_engineer, aliases={"接单"}, priority=10, block=True)
 untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"}, priority=10, block=True)
 close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_engineer, aliases={"关闭工单"}, priority=10, block=True)
@@ -94,7 +99,6 @@ close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_eng
 @customer_message.handle()
 async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: async_scoped_session):
     customer_id = event.get_user_id()
-    send_bot = get_send_bot(bot)
     # 根据客户id获取最新的未关闭工单
     ticket = await session.execute(select(Ticket).filter(Ticket.customer_id == customer_id, Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()).limit(1))
     ticket = ticket.scalars().first()
@@ -184,63 +188,21 @@ async def ticket_check():
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     engineer_id = event.get_user_id()
-    # await engineer_message.finish(f"你好 qq号是{engineer_id}的 bro")
-    # if engineer_id not in focus_ticket_map:
-    await engineer_message.finish("可用指令列表：[alive|pending|all|my|myall|take|untake|close]")
-    # else:
-    #     ticket_id = focus_ticket_map[engineer_id]
-    #     ticket = await session.get(Ticket, ticket_id)
-    #     if not ticket:
-    #         # no ticket record
-    #         raise(ValueError)
-    #     await bot.send_private_msg(user_id=int(ticket.customer_id), message=event.message) # 转发消息给客户
+    await engineer_message.finish("可用指令列表：[list|take|untake|close]")
 
-@get_alive_ticket_matcher.handle()
-async def get_alive_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    tickets = await session.execute(select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()))
-    tickets = tickets.scalars().all()
-    for ticket in tickets:
-        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
+@list_ticket_matcher.handle()
+async def list_ticket(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[Namespace, ShellCommandArgs()]):
+    if args.type not in Types_Ticket.keys():
+        await list_ticket_matcher.finish(f"types:{ ' '.join([key for key in Types_Ticket]) }")
+    tickets = (await session.execute(Types_Ticket[args.type](event.get_user_id()))).scalars().all()
     if not tickets:
-        await get_alive_ticket_matcher.finish("没有活跃工单")
-
-@get_pending_ticket_matcher.handle()
-async def get_pending_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    tickets = await session.execute(select(Ticket).filter(Ticket.status == Status.PENDING).order_by(Ticket.begin_at.desc()))
-    tickets = tickets.scalars().all()
-    for ticket in tickets:
-        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
-    if not tickets:
-        await get_pending_ticket_matcher.finish("没有未接工单")
-
-@get_all_ticket_matcher.handle()
-async def get_all_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    tickets = await session.execute(select(Ticket).order_by(Ticket.begin_at.desc()))
-    tickets = tickets.scalars().all()
-    for ticket in tickets:
-        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
-    if not tickets:
-        await get_all_ticket_matcher.finish("没有工单")
-
-@get_my_alive_ticket_matcher.handle()
-async def get_my_alive_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    engineer_id = event.get_user_id()
-    tickets = await session.execute(select(Ticket).filter(Ticket.engineer_id == engineer_id, Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()))
-    tickets = tickets.scalars().all()
-    for ticket in tickets:
-        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
-    if not tickets:
-        await get_my_alive_ticket_matcher.finish("没有您的活跃工单")
-
-@get_my_all_ticket_matcher.handle()
-async def get_my_all_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    engineer_id = event.get_user_id()
-    tickets = await session.execute(select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(Ticket.begin_at.desc()))
-    tickets = tickets.scalars().all()
-    for ticket in tickets:
-        await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
-    if not tickets:
-        await get_my_all_ticket_matcher.finish("没有您的工单")
+        await list_ticket_matcher.finish("没有")
+    if args.a:
+        for ticket in tickets:
+            await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
+    else:
+        for ticket in tickets:
+            await send_forward_msg(get_send_bot(bot), await print_ticket(ticket.id), event=event)
 
 async def validate_ticket_id(args: str, matcher, error_message: str = "请输入正确的工单号") -> int:
     arg = args.strip()
