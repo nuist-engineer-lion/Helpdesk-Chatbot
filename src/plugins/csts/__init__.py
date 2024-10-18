@@ -70,9 +70,13 @@ close_parser.add_argument("id",help="工单号")
 close_parser.add_argument("-d",help="描述工单")
 close_parser.add_argument("-s",help="设为预定", action='store_true')
 
+list_parser = ArgumentParser()
+list_parser.add_argument("type",help="types: alive pending all myall scheduled")
+
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
+list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer, priority=10, block=True)
 get_alive_ticket_matcher = on_command("alive", rule=is_engineer, aliases={"活跃工单", "工单"}, priority=10, block=True)
 get_pending_ticket_matcher = on_command("pending", rule=is_engineer, aliases={"未接工单"}, priority=10, block=True)
 get_all_ticket_matcher = on_command("all", rule=is_engineer, aliases={"所有工单"}, priority=10, block=True)
