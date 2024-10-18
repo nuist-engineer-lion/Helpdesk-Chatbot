@@ -1,5 +1,6 @@
 pydantic
 pytz
+nonebot2[fastapi]
 nonebot-adapter-onebot
 nonebot-plugin-localstore
 nonebot_plugin_chatrecorder
