@@ -19,14 +19,15 @@ class Ticket(Model):
     customer_id:Mapped[str]
     engineer_id:Mapped[str|None] = mapped_column(nullable=True)
 
-    status:Mapped[Status] = mapped_column(default=Status.CREATING)# creating, pending, processing, alarming, closed
+    status:Mapped[Status] = mapped_column(default=Status.CREATING)
     
     begin_at:Mapped[datetime]
     end_at:Mapped[datetime|None] = mapped_column(nullable=True)
     
     creating_expired_at:Mapped[datetime]
     alarming_expired_at:Mapped[datetime|None] = mapped_column(nullable=True)
-      
+    
+    scheduled_time:Mapped[str|None] = mapped_column(nullable=True)
     description:Mapped[str|None] = mapped_column(nullable=True)
     
     created_at:Mapped[datetime] = mapped_column(default=datetime.now)
