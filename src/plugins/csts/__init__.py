@@ -189,7 +189,7 @@ async def ticket_check():
 
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    await engineer_message.finish("可用指令：[list(列出)|take(接单)|untake(放单)|close(关单)|scheduled(预定)]")
+    await engineer_message.finish("可用指令：[list(列出)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预定)]")
 
 # list 错误处理
 @list_ticket_matcher.handle()
@@ -229,7 +229,7 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None:
         await take_ticket_matcher.finish("工单不存在")
-    if ticket.status != Status.PENDING or ticket.status != Status.SCHEDULED:
+    if ticket.status not in [Status.PENDING,Status.SCHEDULED]:
         await take_ticket_matcher.finish("该工单尚未创建完成或已被接单")
     ticket.status = Status.PROCESSING
     ticket.engineer_id = engineer_id
