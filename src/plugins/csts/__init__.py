@@ -167,7 +167,7 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
-            # 再无感一点，不要告诉机主发出去了（其实是有bug，但是我不知道为什么）
+            # 不要告诉机主转发出去了
             # await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
         if tickets:
             await get_send_bot(bot).send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
@@ -183,7 +183,8 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
-            await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
+            # 不要告诉机主他在催单
+            # await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
         if tickets:
             await get_send_bot(bot).send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
 
@@ -193,7 +194,7 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
 
 # list 错误处理
 @list_ticket_matcher.handle()
-async def list_ticket(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[ParserExit, ShellCommandArgs()]):
+async def _(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[ParserExit, ShellCommandArgs()]):
     await list_ticket_matcher.finish(list_parser.format_help())
 
 # 处理list
@@ -263,7 +264,7 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     await untake_ticket_matcher.finish("放单成功！")
 
 @close_ticket_matcher.handle()
-async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Annotated[ParserExit, ShellCommandArgs()]):
+async def _(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Annotated[ParserExit, ShellCommandArgs()]):
     await close_ticket_matcher.finish(close_parser.format_help())
 
 # 处理关单
@@ -310,7 +311,7 @@ async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scope
     await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
 
 @scheduled_ticket_matcher.handle()
-async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
+async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
     await scheduled_ticket_matcher.finish(scheduled_parser.format_help())
 
 # 处理预定

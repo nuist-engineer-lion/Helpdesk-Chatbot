@@ -18,5 +18,5 @@ class Config(BaseModel):
 
     first_reply: str = "您好，欢迎联系咨询，请详细描述您的问题，我们会尽快为您解答。"# 第一次回复消息
     first_reply_delay: int = 5 # 秒，第一次回复延迟时间
-    second_reply: str = "我们已经收到您的问题，正在为您联系工程师，请稍等片刻。"# 第二次回复消息
-    third_reply: str = "正在为您加急联系中，请稍等片刻。"# 第三次回复消息
+    # second_reply: str = "我们已经收到您的问题，正在为您联系工程师，请稍等片刻。"# 第二次回复消息
+    # third_reply: str = "正在为您加急联系中，请稍等片刻。"# 第三次回复消息
