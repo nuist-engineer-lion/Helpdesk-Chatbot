@@ -81,8 +81,6 @@ list_parser = ArgumentParser(prog="list")
 list_parser.add_argument("type",help=f"types:{ ' '.join([key for key in Types_Ticket]) }")
 list_parser.add_argument("-a",help="用消息转发显示完整接单过程",action='store_true')
 
-
-
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
@@ -90,10 +88,6 @@ list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engin
 take_ticket_matcher = on_command("take", rule=is_engineer, aliases={"接单"}, priority=10, block=True)
 untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"}, priority=10, block=True)
 close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_engineer, aliases={"关单"}, priority=10, block=True)
-# focus_ticket_matcher = on_command("focus", rule=is_engineer, aliases={"关注工单"}, priority=10, block=True)
-# unfocus_ticket_matcher = on_command("unfocus", rule=is_engineer, aliases={"取消关注工单"}, priority=10, block=True)
-
-# focus_ticket_map = {}
 
 # 回复客户消息
 @customer_message.handle()
@@ -153,7 +147,6 @@ async def ticket_check():
     else:
         bot = get_bot()
     # 发通知用发通知的号
-    send_bot = get_send_bot(bot)
     session = get_session()
     # 筛选出所有处于creating但是已经过期的工单
     async with session.begin():
@@ -165,10 +158,10 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
-            await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
+            await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
         if tickets:
-            await send_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
+            await get_send_bot(bot).send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
     
     # 筛选出所有处于alarming但是已经过期的工单
     async with session.begin():
@@ -180,14 +173,13 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
+            await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
-            await send_forward_msg(send_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
         if tickets:
-            await send_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
+            await get_send_bot(bot).send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
 
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    engineer_id = event.get_user_id()
     await engineer_message.finish("可用指令列表：[list|take|untake|close]")
 
 @list_ticket_matcher.handle()
@@ -244,9 +236,6 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     ticket.engineer_id = None
     customer_id = int(ticket.customer_id)
     await session.commit()
-    # # 检查focus列表，如果有工程师focus此工单，则自动unfocus
-    # if focus_ticket_map.get(engineer_id) == ticket_id:
-    #     focus_ticket_map.pop(engineer_id)
     # 通知客户
     await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
@@ -283,24 +272,3 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
     # 通知接单群
     await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{ticket_id}！")
     await close_ticket_matcher.finish("关闭工单成功！")
-
-# @focus_ticket_matcher.handle()
-# async def focus_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
-#     engineer_id = event.get_user_id()
-#     ticket_id = await validate_ticket_id(args, focus_ticket_matcher)
-#     ticket = await session.get(Ticket, ticket_id)
-#     if ticket is None:
-#         await focus_ticket_matcher.finish("工单不存在")
-#     if ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
-#         await focus_ticket_matcher.finish("您未接单或不是该工单的工程师")
-#     focus_ticket_map[engineer_id] = ticket_id
-#     await session.commit()
-#     await focus_ticket_matcher.finish("focus成功！接下啦请直接回复我，我会将消息转发给客户！")
-
-# @unfocus_ticket_matcher.handle()
-# async def unfocus_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session):
-#     engineer_id = event.get_user_id()
-#     if focus_ticket_map.get(engineer_id) is None:
-#         await unfocus_ticket_matcher.finish("您未focus任何工单")
-#     focus_ticket_map.pop(engineer_id)
-#     await unfocus_ticket_matcher.finish("unfocus成功！")
