@@ -106,8 +106,8 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
         msgs.append(
             Message(f"工程师名片[CQ:contact,type=qq,id={ticket_engineer_id}]"))
     # 下面打印历史消息
-    if plugin_config.receive_bot:
-        bot_id = [str(plugin_config.receive_bot)]
+    if plugin_config.front_bot:
+        bot_id = [str(plugin_config.front_bot)]
     else:
         bot_id = None
     message_records = await get_message_records(id1s=[ticket_customer_id], time_start=ticket_begin_at, time_stop=ticket_end_at, id2s=[''], bot_ids=bot_id)

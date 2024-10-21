@@ -35,24 +35,42 @@ __plugin_meta__ = PluginMetadata(
 
 plugin_config = get_plugin_config(Config)
 
-def get_send_bot(bot):
-    if plugin_config.send_bot:
-        return get_bot(str(plugin_config.send_bot))
+def get_backend_bot(bot):
+    if plugin_config.backend_bot:
+        return get_bot(str(plugin_config.backend_bot))
+    else:
+        return bot
+
+def get_front_bot(bot):
+    if plugin_config.front_bot:
+        return get_bot(str(plugin_config.front_bot))
     else:
         return bot
 
 # 定义规则
-def is_receiver(event:MessageEvent) -> bool:
-    if not plugin_config.receive_bot:
+
+def is_front(event:MessageEvent) -> bool:
+    # 没有配置前端一律视作前端
+    if not plugin_config.front_bot:
         return True
-    if event.self_id == int(plugin_config.receive_bot):
+    if event.self_id == int(plugin_config.front_bot):
         return True
     return False
 
-async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的人员为工程师
+def is_backend(event:MessageEvent) -> bool:
+    if not plugin_config.backend_bot:
+        return True
+    if event.self_id == int(plugin_config.backend_bot):
+        return True
+    return False
+    
+
+async def is_engineer(event: MessageEvent) -> bool:
+    # 避免自己给自己发消息反复触发
     if event.get_user_id() in get_bots():
         return False
-    if is_receiver(event):
+    # 从非后端工程师发来的消息
+    if is_backend(event):
         if isinstance(event, GroupMessageEvent):
             return event.group_id == plugin_config.notify_group
         session = get_session()
@@ -62,12 +80,11 @@ async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的�
         return False
 
 async def is_customer(event: PrivateMessageEvent) -> bool:
+    # 自己不会是机主
     if event.get_user_id() in get_bots():
         return False
-    if is_receiver(event):
-        return await is_engineer(event) is False
-    else:
-        return False
+    # 只要是前端发来的一律视作机主(方便整活了属于是)
+    return is_front(event)
 
 Types_Ticket={
     "活动的":lambda id:select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
@@ -110,7 +127,7 @@ untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"
 close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_engineer, aliases={"关单"}, priority=10, block=True)
 force_close_ticket_mathcer = on_command("fclose",rule=is_engineer,aliases={"强制关单"},priority=10,block=True)
 scheduled_ticket_matcher = on_shell_command("scheduled",parser=scheduled_parser, rule=is_engineer, aliases={"预定"}, priority=10, block=True)
-op_engineer_matcher = on_shell_command("engineers",parser=engineer_parser ,rule=to_me()&is_receiver,permission=SUPERUSER)
+op_engineer_matcher = on_shell_command("engineers",parser=engineer_parser ,rule=to_me() & is_backend ,permission=SUPERUSER)
 
 
 # 回复客户消息
@@ -154,7 +171,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         # 转发消息给工程师
         # is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
         await send_forward_msg(
-            get_send_bot(bot), 
+            get_backend_bot(bot), 
             [
                 Message("接收到来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),
                 Message(f"[CQ:contact,type=qq,id={customer_id}]"), 
@@ -165,11 +182,9 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
 
 @scheduler.scheduled_job(trigger="interval", seconds=plugin_config.ticket_checking_interval)
 async def ticket_check():
-    if not plugin_config.receive_bot:
-        # 私聊客户还是用公号
-        bot = get_bot(str(plugin_config.receive_bot))
-    else:
-        bot = get_bot()
+    bot = get_bot()
+    front_bot = get_front_bot(bot)
+    backend_bot = get_backend_bot(bot)
     # 发通知用发通知的号
     session = get_session()
     # 筛选出所有处于creating但是已经过期的工单
@@ -182,11 +197,11 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
-            await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
+            await send_forward_msg(backend_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             # 不要告诉机主转发出去了
-            # await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
+            # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
         if tickets:
-            await get_send_bot(bot).send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
+            await backend_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.new_ticket_notify)
     
     # 筛选出所有处于alarming但是已经过期的工单
     async with session.begin():
@@ -198,11 +213,11 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
-            await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
+            await send_forward_msg(backend_bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
             # 不要告诉机主他在催单
-            # await bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
+            # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
         if tickets:
-            await get_send_bot(bot).send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
+            await backend_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
 
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
@@ -223,12 +238,12 @@ async def list_ticket(bot:Bot,event:MessageEvent,session:async_scoped_session,ar
         await list_ticket_matcher.finish("没有")
     if args.a:
         for ticket in tickets:
-            await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket.id), event=event)
+            await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
     else:
         msgs=[]
         for ticket in tickets:
             msgs.append(await print_ticket(ticket.id))
-        await send_forward_msg(get_send_bot(bot), msgs=msgs, event=event)
+        await send_forward_msg(bot, msgs=msgs, event=event)
 
 async def validate_ticket_id(args: str, matcher, error_message: str = "请输入正确的工单号") -> int:
     arg = args.strip()
@@ -253,8 +268,8 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     await session.commit()
     await session.refresh(ticket)
     # 通知客户
-    await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！")
-    await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"[CQ:contact,type=qq,id={engineer_id}]")
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！")
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"[CQ:contact,type=qq,id={engineer_id}]")
     await take_ticket_matcher.send(f"接单成功！请添加客户为好友！解决后及时关单！")
     await take_ticket_matcher.finish(Message(f"[CQ:contact,type=qq,id={ticket.customer_id}]"))
 
@@ -273,10 +288,10 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     customer_id = int(ticket.customer_id)
     await session.commit()
     # 通知客户
-    await bot.send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
+    await get_front_bot(bot).send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await send_forward_msg(get_send_bot(bot), await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
-    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {ticket_id:0>3} ，工单已重新进入待接单状态！")
+    await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {ticket_id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
 
 @close_ticket_matcher.handle()
@@ -304,11 +319,11 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
     await session.commit()
     await session.refresh(ticket)
     
-    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
     # 通知客户
-    await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
     # 通知接单群
-    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{ticket_id}！")
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{ticket_id}！")
 
 @force_close_ticket_mathcer.handle()
 async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
@@ -324,7 +339,7 @@ async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scope
     await session.refresh(ticket)
     
     await force_close_ticket_mathcer.finish(f"强制关单{ticket_id}")
-    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
 
 @scheduled_ticket_matcher.handle()
 async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
@@ -342,9 +357,9 @@ async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_
     
     await session.commit()
     await session.refresh(ticket)
-    
-    await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{args.time}")
-    await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{ticket_id}")
+    # 发给顾客
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{args.time}")
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{ticket_id}")
 
 
 
@@ -358,7 +373,7 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args:
         if args.a:
             users = await bot.get_group_member_list(group_id=int(plugin_config.notify_group))
             for user in users:
-                if str(user['user_id']) not in [str(plugin_config.send_bot),str(plugin_config.receive_bot)]:
+                if str(user['user_id']) not in [str(plugin_config.backend_bot),str(plugin_config.front_bot)]:
                     engineer = Engineer(engineer_id=str(user['user_id']))
                     session.add(engineer)
         else:
@@ -377,6 +392,6 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args:
         msg = []
         for engineer in engineers:
             msg += engineer.engineer_id
-        await send_forward_msg(get_send_bot(bot),msgs=msg,event=event)
+        await send_forward_msg(bot,msgs=msg,event=event)
     
     
