@@ -32,3 +32,8 @@ class Ticket(Model):
     
     created_at:Mapped[datetime] = mapped_column(default=datetime.now)
     updated_at:Mapped[datetime] = mapped_column(default=datetime.now,onupdate=datetime.now)
+    
+class Engineer(Model):
+    id:Mapped[int] = mapped_column(primary_key=True,autoincrement=True)
+    
+    engineer_id:Mapped[str] = mapped_column(unique=True)

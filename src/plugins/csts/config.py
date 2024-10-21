@@ -4,7 +4,7 @@ from typing import List
 class Config(BaseModel):
     """Plugin Config Here"""
     notify_group: str|int
-    engineers: List[str|int]
+    # engineers: List[str|int]
     
     receive_bot: str|int|None = None
     send_bot: str|int|None = None

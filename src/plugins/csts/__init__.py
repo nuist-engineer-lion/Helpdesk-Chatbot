@@ -5,6 +5,7 @@ from nonebot import get_plugin_config, on_message, on_command
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me,ArgumentParser,Namespace
+from nonebot.permission import SUPERUSER
 from nonebot.params import CommandArg,ShellCommandArgs
 from nonebot.exception import ParserExit
 from datetime import datetime, timedelta, UTC
@@ -16,7 +17,7 @@ from pytz import timezone
 cst = timezone('Asia/Shanghai')
 
 from .config import Config
-from .model import Ticket,Status
+from .model import Ticket,Status,Engineer
 from .utils import send_forward_msg, print_ticket_info,print_ticket
 
 from nonebot import require
@@ -54,7 +55,9 @@ async def is_engineer(event: MessageEvent) -> bool: # 名单或通知群内的�
     if is_receiver(event):
         if isinstance(event, GroupMessageEvent):
             return event.group_id == plugin_config.notify_group
-        return event.get_user_id() in plugin_config.engineers
+        session = get_session()
+        async with session.begin():
+            return bool((await session.execute(select(Engineer).filter(Engineer.engineer_id==event.get_user_id()))).scalar_one_or_none())
     else:
         return False
 
@@ -75,16 +78,28 @@ Types_Ticket={
     }
 
 close_parser = ArgumentParser(prog="close")
-close_parser.add_argument("id",help="工单号")
-close_parser.add_argument("describe",help="描述工单")
+close_parser.add_argument("id",help="工单号",type=int)
+close_parser.add_argument("describe",help="描述工单",type=str)
 
 list_parser = ArgumentParser(prog="list")
-list_parser.add_argument("type",help=f"工单种类:{ ' '.join([key for key in Types_Ticket]) }")
+list_parser.add_argument("type",help=f"工单种类:{ ' '.join([key for key in Types_Ticket]) }",type=str)
 list_parser.add_argument("-a",help="用消息转发显示机主描述",action='store_true')
 
 scheduled_parser = ArgumentParser(prog="scheduled")
-scheduled_parser.add_argument("id",help="工单号")
-scheduled_parser.add_argument("time",help="预计时间")
+scheduled_parser.add_argument("id",help="工单号",type=int)
+scheduled_parser.add_argument("time",help="预计时间",type=str)
+
+engineer_parser = ArgumentParser(prog="engineers")
+engineer_parser_sub = engineer_parser.add_subparsers(dest="sub")
+
+engineer_parser_add = engineer_parser_sub.add_parser("add")
+engineer_parser_add.add_argument("-a",help="加入通知群聊的所有人",action='store_true')
+engineer_parser_add.add_argument("--ids",action="extend", nargs="+", type=str)
+
+engineer_parser_del = engineer_parser_sub.add_parser("del")
+engineer_parser_del.add_argument("ids",action="extend", nargs="+", type=str)
+
+engineer_parser_list = engineer_parser_sub.add_parser("list")
 
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
@@ -95,6 +110,7 @@ untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"
 close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_engineer, aliases={"关单"}, priority=10, block=True)
 force_close_ticket_mathcer = on_command("fclose",rule=is_engineer,aliases={"强制关单"},priority=10,block=True)
 scheduled_ticket_matcher = on_shell_command("scheduled",parser=scheduled_parser, rule=is_engineer, aliases={"预定"}, priority=10, block=True)
+op_engineer_matcher = on_shell_command("engineers",parser=engineer_parser ,rule=to_me()&is_receiver,permission=SUPERUSER)
 
 
 # 回复客户消息
@@ -329,3 +345,38 @@ async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_
     
     await bot.send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{args.time}")
     await get_send_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{ticket_id}")
+
+
+
+@op_engineer_matcher.handle()
+async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
+    await op_engineer_matcher.finish(engineer_parser.format_help())
+    
+@op_engineer_matcher.handle()
+async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[Namespace, ShellCommandArgs()]):
+    if args.sub == "add":
+        if args.a:
+            users = await bot.get_group_member_list(group_id=int(plugin_config.notify_group))
+            for user in users:
+                if str(user['user_id']) not in [str(plugin_config.send_bot),str(plugin_config.receive_bot)]:
+                    engineer = Engineer(engineer_id=str(user['user_id']))
+                    session.add(engineer)
+        else:
+            for id in args.ids:
+                engineer = Engineer(engineer_id=id)
+                session.add(engineer)
+        await session.commit()  
+    elif args.sub == "del":
+        for id in args.ids:
+            engineer = (await session.execute(select(Engineer).where(Engineer.engineer_id==id))).scalar_one_or_none()
+            if engineer:
+                await session.delete(engineer)
+        await session.commit()
+    elif args.sub == "list":
+        engineers = (await session.execute(select(Engineer))).scalars().all()
+        msg = []
+        for engineer in engineers:
+            msg += engineer.engineer_id
+        await send_forward_msg(get_send_bot(bot),msgs=msg,event=event)
+    
+    
