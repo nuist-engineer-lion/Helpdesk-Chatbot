@@ -13,5 +13,5 @@ services:
       HOST: 0.0.0.0
       PORT: 8080
     volumes:
-      - ./data:/data
+      - ./data:/app/data
     restart: always

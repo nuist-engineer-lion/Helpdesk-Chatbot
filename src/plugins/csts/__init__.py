@@ -69,7 +69,7 @@ async def is_engineer(event: MessageEvent) -> bool:
     # 避免自己给自己发消息反复触发
     if event.get_user_id() in get_bots():
         return False
-    # 从非后端工程师发来的消息
+    # 从后端工程师发来的消息
     if is_backend(event):
         if isinstance(event, GroupMessageEvent):
             return event.group_id == plugin_config.notify_group
