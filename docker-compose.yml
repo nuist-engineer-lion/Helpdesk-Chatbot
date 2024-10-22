@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  nonebot:
+    build: .
+    ports:
+      - 8080:8080
+    env_file:
+      - .env.prod
+    environment:
+      ENVIRONMENT: prod
+      HOST: 0.0.0.0
+      PORT: 8080
+    restart: always
