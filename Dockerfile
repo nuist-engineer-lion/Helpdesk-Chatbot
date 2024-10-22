@@ -1,4 +1,4 @@
-FROM python:3.11 as requirements_stage
+FROM python:3.12 as requirements_stage
 
 WORKDIR /wheel
 
@@ -14,7 +14,7 @@ RUN python -m pip wheel --wheel-dir=/wheel --no-cache-dir --requirement ./requir
 RUN python -m pipx run --no-cache nb-cli generate -f /tmp/bot.py
 
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -34,3 +34,5 @@ COPY --from=requirements_stage /wheel /wheel
 RUN pip install --no-cache-dir gunicorn uvicorn[standard] nonebot2 \
   && pip install --no-cache-dir --no-index --force-reinstall --find-links=/wheel -r /wheel/requirements.txt && rm -rf /wheel
 COPY . /app/
+
+CMD ["/start.sh"]
