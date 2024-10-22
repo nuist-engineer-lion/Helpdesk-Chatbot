@@ -217,35 +217,6 @@ async def ticket_check():
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish("指令列表：[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预定)|engineers(管理员操作)]")
 
-# list 错误处理
-@list_ticket_matcher.handle()
-async def _(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[ParserExit, ShellCommandArgs()]):
-    await list_ticket_matcher.finish(list_parser.format_help())
-
-# 处理list
-@list_ticket_matcher.handle()
-async def list_ticket(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[Namespace, ShellCommandArgs()]):
-    if args.type not in Types_Ticket.keys():
-        await list_ticket_matcher.finish(list_parser.format_help())
-    tickets = (await session.execute(Types_Ticket[args.type](event.get_user_id()))).scalars().all()
-    if not tickets:
-        await list_ticket_matcher.finish("没有")
-    if args.a:
-        for ticket in tickets:
-            await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket.id), event=event)
-    else:
-        msgs=[]
-        for ticket in tickets:
-            msgs.append(await print_ticket(ticket.id))
-        await send_forward_msg(get_backend_bot(bot), msgs=msgs, event=event)
-
-async def validate_ticket_id(args: str, matcher, error_message: str = "请输入正确的工单号") -> int:
-    arg = args.strip()
-    try:
-        ticket_id = int(arg)
-    except:
-        await matcher.finish(error_message)
-    return ticket_id
 
 # 所有指定一个id函数共同进行处理
 @close_ticket_matcher.handle()
@@ -413,4 +384,32 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args:
     else:
         await op_engineer_matcher.finish(engineer_parser.format_usage())
     
-    
+# list 错误处理
+@list_ticket_matcher.handle()
+async def _(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[ParserExit, ShellCommandArgs()]):
+    await list_ticket_matcher.finish(list_parser.format_help())
+
+# 处理list
+@list_ticket_matcher.handle()
+async def list_ticket(bot:Bot,event:MessageEvent,session:async_scoped_session,args:Annotated[Namespace, ShellCommandArgs()]):
+    if args.type not in Types_Ticket.keys():
+        await list_ticket_matcher.finish(list_parser.format_help())
+    tickets = (await session.execute(Types_Ticket[args.type](event.get_user_id()))).scalars().all()
+    if not tickets:
+        await list_ticket_matcher.finish("没有")
+    if args.a:
+        for ticket in tickets:
+            await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket.id), event=event)
+    else:
+        msgs=[]
+        for ticket in tickets:
+            msgs.append(await print_ticket(ticket.id))
+        await send_forward_msg(get_backend_bot(bot), msgs=msgs, event=event)
+
+async def validate_ticket_id(args: str, matcher, error_message: str = "请输入正确的工单号") -> int:
+    arg = args.strip()
+    try:
+        ticket_id = int(arg)
+    except:
+        await matcher.finish(error_message)
+    return ticket_id
