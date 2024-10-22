@@ -104,19 +104,18 @@ list_parser.add_argument("-a",help="用消息转发显示机主描述",action='s
 
 scheduled_parser = ArgumentParser(prog="scheduled")
 scheduled_parser.add_argument("id",help="工单号",type=int)
-scheduled_parser.add_argument("time",help="预计时间",type=str)
 
-engineer_parser = ArgumentParser(prog="engineers")
-engineer_parser_sub = engineer_parser.add_subparsers(dest="sub")
+engineer_parser = ArgumentParser(prog="engineers",description="工程师名单操作")
+engineer_parser_sub = engineer_parser.add_subparsers(dest="sub",help='subcommand help')
 
-engineer_parser_add = engineer_parser_sub.add_parser("add")
+engineer_parser_add = engineer_parser_sub.add_parser("add",help="添加工程师")
 engineer_parser_add.add_argument("-a",help="加入通知群聊的所有人",action='store_true')
-engineer_parser_add.add_argument("--ids",action="extend", nargs="+", type=str)
+engineer_parser_add.add_argument("--ids",action="extend", nargs="+", type=str,help="列出id")
 
-engineer_parser_del = engineer_parser_sub.add_parser("del")
-engineer_parser_del.add_argument("ids",action="extend", nargs="+", type=str)
+engineer_parser_del = engineer_parser_sub.add_parser("del",help="删除工程师")
+engineer_parser_del.add_argument("ids",action="extend", nargs="+", type=str,help="列出id")
 
-engineer_parser_list = engineer_parser_sub.add_parser("list")
+engineer_parser_list = engineer_parser_sub.add_parser("list",help="列出全部工程师")
 
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
@@ -219,9 +218,10 @@ async def ticket_check():
         if tickets:
             await backend_bot.send_group_msg(group_id=plugin_config.notify_group, message=plugin_config.alarm_ticket_notify)
 
+# 捕获未能解析的工程师命令
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    await engineer_message.finish("可用指令：[list(列出)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预定)]")
+    await engineer_message.finish("指令列表：[list(列出)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预定)|engineers(管理员操作)]")
 
 # list 错误处理
 @list_ticket_matcher.handle()
@@ -366,7 +366,6 @@ async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_
 @op_engineer_matcher.handle()
 async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
     await op_engineer_matcher.finish(engineer_parser.format_help())
-    
 @op_engineer_matcher.handle()
 async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[Namespace, ShellCommandArgs()]):
     if args.sub == "add":
@@ -377,11 +376,15 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args:
                     engineer = Engineer(engineer_id=str(user['user_id']))
                     session.add(engineer)
         else:
+            if not args.ids:
+                await op_engineer_matcher.finish(engineer_parser_add.format_help())
             for id in args.ids:
                 engineer = Engineer(engineer_id=id)
                 session.add(engineer)
         await session.commit()  
     elif args.sub == "del":
+        if not args.ids:
+            await op_engineer_matcher.finish(engineer_parser_del.format_help())
         for id in args.ids:
             engineer = (await session.execute(select(Engineer).where(Engineer.engineer_id==id))).scalar_one_or_none()
             if engineer:
@@ -391,7 +394,9 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args:
         engineers = (await session.execute(select(Engineer))).scalars().all()
         msg = []
         for engineer in engineers:
-            msg += engineer.engineer_id
+            msg += Message(engineer.engineer_id)
         await send_forward_msg(bot,msgs=msg,event=event)
+    else:
+        await op_engineer_matcher.finish(engineer_parser.format_usage())
     
     
