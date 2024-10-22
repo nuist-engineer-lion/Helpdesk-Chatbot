@@ -1,12 +1,12 @@
 from typing import Annotated
-from nonebot import get_bots, logger, on_shell_command, require, get_bot
+from nonebot import get_bots, logger, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
 from nonebot.rule import Rule
-from nonebot import get_plugin_config, on_message, on_command
+from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me,ArgumentParser,Namespace
 from nonebot.permission import SUPERUSER
-from nonebot.params import CommandArg,ShellCommandArgs
+from nonebot.params import CommandArg,ShellCommandArgs,ArgPlainText
 from nonebot.exception import ParserExit
 from datetime import datetime, timedelta, UTC
 from nonebot_plugin_orm import async_scoped_session, get_session
@@ -94,16 +94,9 @@ Types_Ticket={
     "所有我的":lambda engineer_id:select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(Ticket.begin_at.desc())
     }
 
-close_parser = ArgumentParser(prog="close")
-close_parser.add_argument("id",help="工单号",type=int)
-close_parser.add_argument("describe",help="描述工单",type=str)
-
 list_parser = ArgumentParser(prog="list")
 list_parser.add_argument("type",help=f"工单种类:{ ' '.join([key for key in Types_Ticket]) }",type=str)
 list_parser.add_argument("-a",help="用消息转发显示机主描述",action='store_true')
-
-scheduled_parser = ArgumentParser(prog="scheduled")
-scheduled_parser.add_argument("id",help="工单号",type=int)
 
 engineer_parser = ArgumentParser(prog="engineers",description="工程师名单操作")
 engineer_parser_sub = engineer_parser.add_subparsers(dest="sub",help='subcommand help')
@@ -120,13 +113,13 @@ engineer_parser_list = engineer_parser_sub.add_parser("list",help="列出全部�
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
-list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer, aliases={"列出"} , priority=10, block=True)
-get_ticket_matcher = on_shell_command("get",rule=is_engineer, aliases={"获取"} , priority=10 , block= True)
-take_ticket_matcher = on_command("take", rule=is_engineer, aliases={"接单"}, priority=10, block=True)
-untake_ticket_matcher = on_command("untake", rule=is_engineer, aliases={"放单"}, priority=10, block=True)
-close_ticket_matcher = on_shell_command("close",parser=close_parser, rule=is_engineer, aliases={"关单"}, priority=10, block=True)
-force_close_ticket_mathcer = on_command("fclose",rule=is_engineer,aliases={"强制关单"},priority=10,block=True)
-scheduled_ticket_matcher = on_shell_command("scheduled",parser=scheduled_parser, rule=is_engineer, aliases={"预定"}, priority=10, block=True)
+list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer & to_me(), aliases={"列出"} , priority=10, block=True)
+get_ticket_matcher = on_command("get",rule=is_engineer & to_me(), aliases={"获取"} , priority=10 , block= True)
+take_ticket_matcher = on_command("take", rule=is_engineer & to_me(), aliases={"接单"}, priority=10, block=True)
+untake_ticket_matcher = on_command("untake", rule=is_engineer & to_me(), aliases={"放单"}, priority=10, block=True)
+close_ticket_matcher = on_command("close", rule=is_engineer & to_me(), aliases={"关单"}, priority=10, block=True)
+force_close_ticket_mathcer = on_command("fclose",rule=is_engineer & to_me(),aliases={"强制关单"},priority=10,block=True)
+scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预定"}, priority=10, block=True)
 op_engineer_matcher = on_shell_command("engineers",parser=engineer_parser ,rule=to_me() & is_backend ,permission=SUPERUSER, priority=10,block=True)
 
 
@@ -254,25 +247,37 @@ async def validate_ticket_id(args: str, matcher, error_message: str = "请输入
         await matcher.finish(error_message)
     return ticket_id
 
-# 获取某一单的信息
+# 所有指定一个id函数共同进行处理
+@close_ticket_matcher.handle()
+@force_close_ticket_mathcer.handle()
+@untake_ticket_matcher.handle()
 @get_ticket_matcher.handle()
-async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
-    ticket_id = await validate_ticket_id(args.extract_plain_text(), take_ticket_matcher)
-    ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
-        await take_ticket_matcher.finish("工单不存在")
-    await send_forward_msg(bot,await print_ticket_info(ticket.id),event=event)
-    
-# 处理接单
 @take_ticket_matcher.handle()
-async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+@scheduled_ticket_matcher.handle()
+async def _(matcher: Matcher,session: async_scoped_session, args: Message = CommandArg()):
+    if args.extract_plain_text():
+        ticket_id = await validate_ticket_id(args.extract_plain_text(), matcher)
+        ticket = await session.get(Ticket, ticket_id)
+        if ticket:
+            matcher.set_arg("id", args)
+        else:
+            await matcher.finish("工单不存在")
+
+
+# 获取某一单的信息
+@get_ticket_matcher.got("id", prompt="单号？")
+async def get_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
+    await send_forward_msg(bot,await print_ticket_info(int(id)),event=event)
+
+# 处理接单
+@take_ticket_matcher.got("id", prompt="单号？")
+async def take_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: async_scoped_session,id: str = ArgPlainText()):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args.extract_plain_text(), take_ticket_matcher)
-    ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
-        await take_ticket_matcher.finish("工单不存在")
+    ticket = await session.get(Ticket, id)
+    if not ticket:
+        await matcher.finish()
     if ticket.status not in [Status.PENDING,Status.SCHEDULED]:
-        await take_ticket_matcher.finish("该工单尚未创建完成或已被接单")
+        await matcher.finish("该工单尚未创建完成或已被接单")
     ticket.status = Status.PROCESSING
     ticket.engineer_id = engineer_id
     await session.commit()
@@ -280,19 +285,18 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     # 通知客户
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已接单！您可以直接用此会话与工程师沟通，也可以添加工程师为好友！")
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"[CQ:contact,type=qq,id={engineer_id}]")
-    await take_ticket_matcher.send(f"接单成功！请添加客户为好友！解决后及时关单！")
-    await take_ticket_matcher.finish(Message(f"[CQ:contact,type=qq,id={ticket.customer_id}]"))
+    await matcher.send(f"接单成功！请添加客户为好友！解决后及时关单！")
+    await matcher.finish(Message(f"[CQ:contact,type=qq,id={ticket.customer_id}]"))
 
 # 处理放单
-@untake_ticket_matcher.handle()
-async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+@untake_ticket_matcher.got("id", prompt="单号？")
+async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args.extract_plain_text(), untake_ticket_matcher)
-    ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
-        await untake_ticket_matcher.finish("工单不存在")
+    ticket = await session.get(Ticket, id)
+    if not ticket:
+        await matcher.finish()
     if ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
-        await untake_ticket_matcher.finish("您未接单或不是该工单的工程师")
+        await matcher.finish("您未接单或不是该工单的工程师")
     ticket.status = Status.PENDING
     ticket.engineer_id = None
     customer_id = int(ticket.customer_id)
@@ -300,82 +304,78 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
     # 通知客户
     await get_front_bot(bot).send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await send_forward_msg(bot, await print_ticket_info(ticket_id), target_group_id=plugin_config.notify_group)
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {ticket_id:0>3} ，工单已重新进入待接单状态！")
-    await untake_ticket_matcher.finish("放单成功！")
-
-@close_ticket_matcher.handle()
-async def _(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Annotated[ParserExit, ShellCommandArgs()]):
-    await close_ticket_matcher.finish(close_parser.format_help())
+    await send_forward_msg(bot, await print_ticket_info(int(id)), target_group_id=plugin_config.notify_group)
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
+    await matcher.finish("放单成功！")
 
 # 处理关单
-@close_ticket_matcher.handle()
-async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Annotated[Namespace, ShellCommandArgs()]):
+@close_ticket_matcher.got("id", prompt="单号？")
+@close_ticket_matcher.got("describe", prompt="请描述工单")
+async def close_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(), describe: str = ArgPlainText()):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args.id, close_ticket_matcher)
-    ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
-        await close_ticket_matcher.finish("工单不存在")
+    ticket = await session.get(Ticket, id)
+    if not ticket:
+        await matcher.finish()
     
     if ticket.status == Status.SCHEDULED:
         ticket.engineer_id=engineer_id
-        await close_ticket_matcher.send("完成的预定")
+        await matcher.send("完成的预定")
     elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
-        await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
-    ticket.description = args.describe
+        await matcher.finish("您未接单或不是该工单的工程师")
+    ticket.description = describe
     ticket.status = Status.CLOSED
     ticket.end_at = datetime.fromtimestamp(event.time, cst)
     
     await session.commit()
     await session.refresh(ticket)
     
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(id))
     # 通知客户
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
     # 通知接单群
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{ticket_id}！")
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{id}！")
 
-@force_close_ticket_mathcer.handle()
-async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+# 强制关单
+@force_close_ticket_mathcer.got("id", prompt="单号？")
+@force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")
+async def force_close_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(), describe: str = ArgPlainText ()):
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(args.extract_plain_text(), close_ticket_matcher)
+    ticket_id = await validate_ticket_id(id, close_ticket_matcher)
     ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
+    if not ticket:
         await close_ticket_matcher.finish("工单不存在")
     
     ticket.status = Status.CLOSED
     ticket.end_at = datetime.fromtimestamp(event.time, cst)
+    ticket.description = "强制关单:" + describe
     await session.commit()
     await session.refresh(ticket)
     
-    await force_close_ticket_mathcer.finish(f"强制关单{ticket_id}")
+    await matcher.finish(f"强制关单{ticket_id}")
     await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
 
-@scheduled_ticket_matcher.handle()
-async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
-    await scheduled_ticket_matcher.finish(scheduled_parser.format_help())
-
 # 处理预定
-@scheduled_ticket_matcher.handle()
-async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[Namespace, ShellCommandArgs()]):
-    ticket_id = await validate_ticket_id(args.id, close_ticket_matcher)
-    ticket = await session.get(Ticket, ticket_id)
-    if ticket is None:
+@scheduled_ticket_matcher.got("id", prompt="单号？")
+@scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间？（会直接转发给机主）")
+async def scheduled_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: async_scoped_session,  id:str = ArgPlainText() ,scheduled_time:str = ArgPlainText()):
+    ticket = await session.get(Ticket, id)
+    if not ticket:
         await close_ticket_matcher.finish("工单不存在")
     ticket.status = Status.SCHEDULED
-    ticket.scheduled_time = args.time
+    ticket.scheduled_time = scheduled_time
     
     await session.commit()
     await session.refresh(ticket)
     # 发给顾客
-    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{args.time}")
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{ticket_id}")
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{scheduled_time}")
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{id}")
 
 
 
 @op_engineer_matcher.handle()
 async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[ParserExit, ShellCommandArgs()]):
     await op_engineer_matcher.finish(engineer_parser.format_help())
+
 @op_engineer_matcher.handle()
 async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args: Annotated[Namespace, ShellCommandArgs()]):
     if args.sub == "add":
