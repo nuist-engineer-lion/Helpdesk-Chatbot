@@ -232,12 +232,12 @@ async def list_ticket(bot:Bot,event:MessageEvent,session:async_scoped_session,ar
         await list_ticket_matcher.finish("没有")
     if args.a:
         for ticket in tickets:
-            await send_forward_msg(bot, await print_ticket_info(ticket.id), event=event)
+            await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket.id), event=event)
     else:
         msgs=[]
         for ticket in tickets:
             msgs.append(await print_ticket(ticket.id))
-        await send_forward_msg(bot, msgs=msgs, event=event)
+        await send_forward_msg(get_backend_bot(bot), msgs=msgs, event=event)
 
 async def validate_ticket_id(args: str, matcher, error_message: str = "请输入正确的工单号") -> int:
     arg = args.strip()
@@ -267,7 +267,7 @@ async def _(matcher: Matcher,session: async_scoped_session, args: Message = Comm
 # 获取某一单的信息
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
-    await send_forward_msg(bot,await print_ticket_info(int(id)),event=event)
+    await send_forward_msg(get_backend_bot(bot),await print_ticket_info(int(id)),event=event)
 
 # 处理接单
 @take_ticket_matcher.got("id", prompt="单号？")
@@ -304,8 +304,8 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
     # 通知客户
     await get_front_bot(bot).send_private_msg(user_id=customer_id, message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await send_forward_msg(bot, await print_ticket_info(int(id)), target_group_id=plugin_config.notify_group)
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
+    await send_forward_msg(get_backend_bot(bot), await print_ticket_info(int(id)), target_group_id=plugin_config.notify_group)
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await matcher.finish("放单成功！")
 
 # 处理关单
@@ -329,11 +329,11 @@ async def close_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, session: 
     await session.commit()
     await session.refresh(ticket)
     
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(id))
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(id))
     # 通知客户
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
     # 通知接单群
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{id}！")
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"工程师{engineer_id}已处理完{id}！")
 
 # 强制关单
 @force_close_ticket_mathcer.got("id", prompt="单号？")
@@ -352,7 +352,7 @@ async def force_close_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, ses
     await session.refresh(ticket)
     
     await matcher.finish(f"强制关单{ticket_id}")
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
 
 # 处理预定
 @scheduled_ticket_matcher.got("id", prompt="单号？")
@@ -368,7 +368,7 @@ async def scheduled_ticket(bot: Bot,matcher: Matcher, event: MessageEvent, sessi
     await session.refresh(ticket)
     # 发给顾客
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{scheduled_time}")
-    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{id}")
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{id}")
 
 
 
@@ -405,7 +405,7 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,  args:
         msg = []
         for engineer in engineers:
             msg += Message(engineer.engineer_id)
-        await send_forward_msg(bot,msgs=msg,event=event)
+        await send_forward_msg(get_backend_bot(bot),msgs=msg,event=event)
     else:
         await op_engineer_matcher.finish(engineer_parser.format_usage())
     
