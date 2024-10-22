@@ -32,7 +32,7 @@ COPY ./docker/_main.py /app
 COPY --from=requirements_stage /wheel /wheel
 
 RUN pip install --no-cache-dir gunicorn uvicorn[standard] nonebot2 \
-  && pip install --no-cache-dir --no-index --force-reinstall --find-links=/wheel -r /wheel/requirements.txt && rm -rf /wheel
+  && pip install --no-cache-dir --no-index --force-reinstall --find-links=/wheel -r /wheel/requirements.txt && rm -rf /wheel && mkdir data
 COPY . /app/
 
 CMD ["/start.sh"]
