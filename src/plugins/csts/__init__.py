@@ -120,7 +120,7 @@ take_ticket_matcher = on_command("take", rule=is_engineer & to_me(), aliases={"�
 untake_ticket_matcher = on_command("untake", rule=is_engineer & to_me(), aliases={"放单"}, priority=10, block=True)
 close_ticket_matcher = on_command("close", rule=is_engineer & to_me(), aliases={"关单"}, priority=10, block=True)
 force_close_ticket_mathcer = on_command("fclose",rule=is_engineer & to_me(),aliases={"强制关单"},priority=10,block=True)
-scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预定"}, priority=10, block=True)
+scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预约"}, priority=10, block=True)
 op_engineer_matcher = on_shell_command("engineers",parser=engineer_parser ,rule=to_me() & is_backend ,permission=SUPERUSER, priority=10,block=True)
 
 
@@ -340,13 +340,15 @@ async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scope
 
 # 处理预定
 @scheduled_ticket_matcher.got("id", prompt="单号？")
-@scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间？（会直接转发给机主）")
+@scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
 async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,  id:str = ArgPlainText() ,scheduled_time:str = ArgPlainText()):
     if bot.self_id != get_backend_bot(bot).self_id:
         await scheduled_ticket_matcher.finish()
     ticket = await session.get(Ticket, id)
     if not ticket:
         await scheduled_ticket_matcher.finish("工单不存在")
+    if ticket.status == Status.CLOSED:
+        await scheduled_ticket_matcher.finish("工单已经关闭，不能再次预约")
     ticket.status = Status.SCHEDULED
     ticket.scheduled_time = scheduled_time
     
@@ -354,7 +356,7 @@ async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_
     await session.refresh(ticket)
     # 发给顾客
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{scheduled_time}")
-    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约id:{id}")
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约:{id}")
     
     await scheduled_ticket_matcher.finish()
 
