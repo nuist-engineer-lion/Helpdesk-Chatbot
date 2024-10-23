@@ -89,6 +89,7 @@ async def is_customer(event: PrivateMessageEvent) -> bool:
 Types_Ticket={
     "活动的":lambda id:select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "未接的":lambda id:select(Ticket).filter(Ticket.status == Status.PENDING).order_by(Ticket.begin_at.desc()),
+    "完成的":lambda id:select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "我的":lambda engineer_id:select(Ticket).filter(Ticket.engineer_id == engineer_id, Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "所有的":lambda id:select(Ticket).order_by(Ticket.begin_at.desc()),
     "所有我的":lambda engineer_id:select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(Ticket.begin_at.desc())
@@ -239,7 +240,7 @@ async def _(matcher: Matcher,session: async_scoped_session, args: Message = Comm
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     if bot == get_front_bot(bot):
-        await get_ticket_matcher.finish()
+        await get_ticket_matcher.finish("工单不存在")
     await send_forward_msg(get_backend_bot(bot),await print_ticket_info(int(id)),event=event)
     await get_ticket_matcher.finish()
 
@@ -247,7 +248,7 @@ async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessio
 @take_ticket_matcher.got("id", prompt="单号？")
 async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,id: str = ArgPlainText()):
     if bot == get_front_bot(bot):
-        await take_ticket_matcher.finish()
+        await take_ticket_matcher.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
     if not ticket:
@@ -268,7 +269,7 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
 @untake_ticket_matcher.got("id", prompt="单号？")
 async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     if bot == get_front_bot(bot):
-        await untake_ticket_matcher.finish()
+        await untake_ticket_matcher.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
     if not ticket:
@@ -291,7 +292,7 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
 @close_ticket_matcher.got("describe", prompt="请描述工单")
 async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(), describe: str = ArgPlainText()):
     if bot == get_front_bot(bot):
-        await close_ticket_matcher.finish()
+        await close_ticket_matcher.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
     if not ticket:
@@ -321,7 +322,7 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
 @force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")
 async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(), describe: str = ArgPlainText ()):
     if bot == get_front_bot(bot):
-        await force_close_ticket_mathcer.finish()
+        await force_close_ticket_mathcer.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket_id = await validate_ticket_id(id, close_ticket_matcher)
     ticket = await session.get(Ticket, ticket_id)
@@ -342,7 +343,7 @@ async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scope
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间？（会直接转发给机主）")
 async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,  id:str = ArgPlainText() ,scheduled_time:str = ArgPlainText()):
     if bot == get_front_bot(bot):
-        await scheduled_ticket_matcher.finish()
+        await scheduled_ticket_matcher.finish("工单不存在")
     ticket = await session.get(Ticket, id)
     if not ticket:
         await close_ticket_matcher.finish("工单不存在")

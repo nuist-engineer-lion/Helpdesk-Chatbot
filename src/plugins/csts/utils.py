@@ -73,6 +73,8 @@ async def print_ticket(ticket_id: int) -> Message:
             msg=msg+f'结束时间:{ticket.end_at.strftime("%Y-%m-%d %H:%M:%S")}\n'
         if ticket.scheduled_time:
             msg=msg+f'预约时间:{ticket.scheduled_time}'
+        if ticket.description:
+            msg=msg+f'描述:{ticket.description}'
         return Message(msg)
 
 
@@ -92,6 +94,7 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
         ticket_customer_id = ticket.customer_id
         ticket_engineer_id = ticket.engineer_id
         ticket_scheduled_time = ticket.scheduled_time
+        ticket_description = ticket.description
     msgs.append(Message(f"工单号: {ticket_id:0>3}"))
     msgs.append(Message(f"状态: {ticket_status}"))
     msgs.append(
@@ -105,6 +108,10 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
     if ticket_engineer_id:
         msgs.append(
             Message(f"工程师名片[CQ:contact,type=qq,id={ticket_engineer_id}]"))
+    if ticket_description:
+        msgs.append(
+            Message(f'描述:{ticket.description}')
+        )
     # 下面打印历史消息
     if plugin_config.front_bot:
         bot_id = [str(plugin_config.front_bot)]
