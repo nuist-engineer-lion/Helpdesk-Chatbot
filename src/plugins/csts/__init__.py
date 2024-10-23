@@ -239,7 +239,7 @@ async def _(matcher: Matcher,session: async_scoped_session, args: Message = Comm
 # 获取某一单的信息
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
-    if bot == get_front_bot(bot):
+    if bot.self_id != get_backend_bot(bot).self_id:
         await get_ticket_matcher.finish("工单不存在")
     await send_forward_msg(get_backend_bot(bot),await print_ticket_info(int(id)),event=event)
     await get_ticket_matcher.finish()
@@ -247,7 +247,7 @@ async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessio
 # 处理接单
 @take_ticket_matcher.got("id", prompt="单号？")
 async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,id: str = ArgPlainText()):
-    if bot == get_front_bot(bot):
+    if bot.self_id != get_backend_bot(bot).self_id:
         await take_ticket_matcher.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
@@ -268,7 +268,7 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
 # 处理放单
 @untake_ticket_matcher.got("id", prompt="单号？")
 async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
-    if bot == get_front_bot(bot):
+    if bot.self_id != get_backend_bot(bot).self_id:
         await untake_ticket_matcher.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
@@ -291,7 +291,7 @@ async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_ses
 @close_ticket_matcher.got("id", prompt="单号？")
 @close_ticket_matcher.got("describe", prompt="请描述工单")
 async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(), describe: str = ArgPlainText()):
-    if bot == get_front_bot(bot):
+    if bot.self_id != get_backend_bot(bot).self_id:
         await close_ticket_matcher.finish("工单不存在")
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
@@ -321,13 +321,13 @@ async def close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sess
 @force_close_ticket_mathcer.got("id", prompt="单号？")
 @force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")
 async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(), describe: str = ArgPlainText ()):
-    if bot == get_front_bot(bot):
-        await force_close_ticket_mathcer.finish("工单不存在")
+    if bot.self_id != get_backend_bot(bot).self_id:
+        await force_close_ticket_mathcer.finish()
     engineer_id = event.get_user_id()
-    ticket_id = await validate_ticket_id(id, close_ticket_matcher)
+    ticket_id = await validate_ticket_id(id, force_close_ticket_mathcer)
     ticket = await session.get(Ticket, ticket_id)
     if not ticket:
-        await close_ticket_matcher.finish("工单不存在")
+        await force_close_ticket_mathcer.finish("工单不存在")
     
     ticket.status = Status.CLOSED
     ticket.end_at = datetime.fromtimestamp(event.time, cst)
@@ -336,17 +336,17 @@ async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scope
     await session.refresh(ticket)
     
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message= await print_ticket(ticket_id))
-    await close_ticket_matcher.finish(f"强制关单{ticket_id}")
+    await force_close_ticket_mathcer.finish(f"强制关单{ticket_id}")
 
 # 处理预定
 @scheduled_ticket_matcher.got("id", prompt="单号？")
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间？（会直接转发给机主）")
 async def scheduled_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,  id:str = ArgPlainText() ,scheduled_time:str = ArgPlainText()):
-    if bot == get_front_bot(bot):
-        await scheduled_ticket_matcher.finish("工单不存在")
+    if bot.self_id != get_backend_bot(bot).self_id:
+        await scheduled_ticket_matcher.finish()
     ticket = await session.get(Ticket, id)
     if not ticket:
-        await close_ticket_matcher.finish("工单不存在")
+        await scheduled_ticket_matcher.finish("工单不存在")
     ticket.status = Status.SCHEDULED
     ticket.scheduled_time = scheduled_time
     
