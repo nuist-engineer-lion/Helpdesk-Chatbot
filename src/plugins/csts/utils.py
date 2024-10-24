@@ -110,7 +110,7 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
             Message(f"工程师名片[CQ:contact,type=qq,id={ticket_engineer_id}]"))
     if ticket_description:
         msgs.append(
-            Message(f'描述:{ticket.description}')
+            Message(f'描述:{ticket_description}')
         )
     # 下面打印历史消息
     if plugin_config.front_bot:
