@@ -72,7 +72,7 @@ async def print_ticket(ticket_id: int) -> Message:
         if ticket.end_at:
             msg=msg+f'结束时间:{ticket.end_at.strftime("%Y-%m-%d %H:%M:%S")}\n'
         if ticket.scheduled_time:
-            msg=msg+f'预约时间:{ticket.scheduled_time}'
+            msg=msg+f'预约时间:{ticket.scheduled_time}\n'
         if ticket.description:
             msg=msg+f'描述:{ticket.description}'
         return Message(msg)
