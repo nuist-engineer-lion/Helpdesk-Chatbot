@@ -152,6 +152,29 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
             Ticket.begin_at.desc()).limit(1))
     ticket = ticket.scalars().first()
     if ticket is None:  # 如果没有工单
+        # 检查是否存在最近刚刚关闭的工单
+        last_ticket = (await session.execute(
+            select(Ticket).filter(Ticket.customer_id == customer_id, Ticket.status == Status.CLOSED).order_by(
+            Ticket.begin_at.desc()).limit(1)
+        )).scalars().first()
+        
+        # 如果有上一次的工单则进行判断
+        if last_ticket:
+            if last_ticket.end_at:
+                # 如果小于预定时间
+                if last_ticket.end_at < datetime.now() - timedelta(
+                    seconds=plugin_config.ticket_create_interval
+                ):
+                    # 将关单时间设为当前时间，通知群聊并结束处理
+                    await send_forward_msg(get_backend_bot(bot),
+                                           [
+                        Message(f"{customer_id}在工单{last_ticket.id}结束后说:"),
+                        event.message
+                        ],
+                        target_group_id=plugin_config.notify_group)
+                    await customer_message.finish()
+        
+        # 如果没有则直接创建
         # 创建工单
         ticket = Ticket(customer_id=customer_id, begin_at=datetime.fromtimestamp(event.time, cst),
                         creating_expired_at=datetime.now() + timedelta(
@@ -161,7 +184,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         logger.info("创建工单已经提交到数据库")
         # 延时n秒，用于模拟工程师接单
         try:
-            await bot.call_api("set_input_status", user_id=customer_id)
+            await get_front_bot(bot).call_api("set_input_status", user_id=customer_id)
         except:
             logger.warning("不支持set_input_status api")
         await sleep(plugin_config.first_reply_delay)
