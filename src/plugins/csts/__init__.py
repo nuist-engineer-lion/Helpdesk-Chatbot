@@ -1,11 +1,11 @@
 from nonebot_plugin_apscheduler import scheduler
 from typing import Annotated
-from nonebot import  get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
+from nonebot import get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
 from nonebot.matcher import Matcher
-from nonebot.adapters.onebot.v11 import Bot,Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message,MessageSegment
+from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me, ArgumentParser, Namespace
-from nonebot.permission import SUPERUSER,Permission,User
+from nonebot.permission import SUPERUSER, Permission, User
 from nonebot.params import CommandArg, ShellCommandArgs, ArgPlainText
 from nonebot.exception import ParserExit
 from datetime import datetime, timedelta, UTC
@@ -142,7 +142,8 @@ send_ticket_matcher = on_command("send", rule=is_engineer & to_me(), aliases={
                                  "留言"}, priority=10, block=True)
 op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule=to_me() & is_backend,
                                        permission=SUPERUSER, priority=10, block=True)
-who_asked_matcher = on_keyword({"我恨你"},rule=is_engineer,priority=11)
+who_asked_matcher = on_keyword(
+    {"我恨你", "I hate you"}, rule=is_engineer, priority=11)
 
 
 # 回复客户消息
@@ -308,7 +309,7 @@ async def _(matcher: Matcher, session: async_scoped_session, args: Message = Com
             await matcher.finish("工单不存在")
 
 
-async def limit_mathcer_backend_bot(event:Event):
+async def limit_mathcer_backend_bot(event: Event):
     if plugin_config.backend_bot:
         if event.self_id == int(plugin_config.backend_bot):
             return True
@@ -316,7 +317,8 @@ async def limit_mathcer_backend_bot(event:Event):
             return False
     else:
         return True
-    
+
+
 @close_ticket_matcher.permission_updater
 @force_close_ticket_mathcer.permission_updater
 @untake_ticket_matcher.permission_updater
@@ -324,14 +326,23 @@ async def limit_mathcer_backend_bot(event:Event):
 @take_ticket_matcher.permission_updater
 @scheduled_ticket_matcher.permission_updater
 @send_ticket_matcher.permission_updater
+# 群内确认相应者是后端
 async def _(event: Event, matcher: Matcher) -> Permission:
-    return Permission(User.from_event(event=event,perm=Permission(limit_mathcer_backend_bot)))
+    return Permission(User.from_event(event=event, perm=Permission(limit_mathcer_backend_bot)))
+
+
+@scheduled_ticket_matcher.got("id", prompt="单号？")
+@send_ticket_matcher.got("id", "单号？")
+@force_close_ticket_mathcer.got("id", prompt="单号？")
+# 多级获取命令中途检查单号合法性
+async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainText()):
+    ticket = await get_db_ticket(id, matcher, session)
 
 
 # 获取某一单的信息
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
     await get_ticket_matcher.finish()
 
@@ -339,7 +350,7 @@ async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: a
 # 处理接单
 @take_ticket_matcher.got("id", prompt="单号？")
 async def take_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     engineer_id = event.get_user_id()
     if not ticket:
         await take_ticket_matcher.finish()
@@ -361,7 +372,7 @@ async def take_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: 
 # 处理放单
 @untake_ticket_matcher.got("id", prompt="单号？")
 async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     engineer_id = event.get_user_id()
     if not ticket:
         await untake_ticket_matcher.finish()
@@ -384,17 +395,21 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
 
 # 处理关单
 @close_ticket_matcher.got("id", prompt="单号？")
+async def close_ticket_front(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
+    ticket = await get_db_ticket(id, matcher, session)
+    engineer_id = event.get_user_id()
+    if ticket.status == Status.SCHEDULED:
+        ticket.engineer_id = engineer_id
+        await close_ticket_matcher.send("完成本预定")
+    elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
+        await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
+
+
 @close_ticket_matcher.got("describe", prompt="请描述工单")
 async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                        describe: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     engineer_id = event.get_user_id()
-
-    if ticket.status == Status.SCHEDULED:
-        ticket.engineer_id = engineer_id
-        await close_ticket_matcher.send("完成的预定")
-    elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
-        await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
     ticket.description = describe
     ticket.status = Status.CLOSED
     ticket.end_at = datetime.fromtimestamp(event.time, cst)
@@ -414,11 +429,10 @@ async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session:
 
 
 # 强制关单
-@force_close_ticket_mathcer.got("id", prompt="单号？")
 @force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")
 async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                              describe: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     engineer_id = event.get_user_id()
 
     ticket.status = Status.CLOSED
@@ -434,11 +448,10 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
 
 
 # 处理预定
-@scheduled_ticket_matcher.got("id", prompt="单号？")
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
 async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                            scheduled_time: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     if ticket.status == Status.CLOSED:
         await scheduled_ticket_matcher.finish("工单已经关闭，不能再次预约")
     ticket.status = Status.SCHEDULED
@@ -454,11 +467,10 @@ async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, sess
 
 
 # 留言处理
-@send_ticket_matcher.got("id", "单号？")
 @send_ticket_matcher.got("send_msg", "留言内容？")
 async def send_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                       send_msg: str = ArgPlainText()):
-    ticket = await check_backend_ticket(id, bot, matcher, session)
+    ticket = await get_db_ticket(id, matcher, session)
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=send_msg)
     await matcher.finish("已转发留言")
 
@@ -539,14 +551,15 @@ async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "
     return ticket_id
 
 
-async def check_backend_ticket(id: str, bot: Bot, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
+async def get_db_ticket(id: str, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
     ticket = await session.get(Ticket, id)
     if not ticket:
-        await matcher.finish("工单不存在")
+        await matcher.finish(error_message)
     else:
         return ticket
 
-# 谁问你了
+
 @who_asked_matcher.handle()
-async def who_asked(bot:Bot,event:MessageEvent):
+# 谁问你了
+async def who_asked(bot: Bot, event: MessageEvent):
     await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}]谁问你了"))
