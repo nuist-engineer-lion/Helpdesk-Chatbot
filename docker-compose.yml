@@ -14,4 +14,5 @@ services:
       PORT: 8080
     volumes:
       - ./data:/app/data
+      - .env.prod:/app/.env.prod
     restart: always
