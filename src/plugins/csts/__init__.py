@@ -1,6 +1,6 @@
 from nonebot_plugin_apscheduler import scheduler
 from typing import Annotated
-from nonebot import get_bots, logger, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
+from nonebot import get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
 from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
 from nonebot.plugin import PluginMetadata
@@ -142,6 +142,7 @@ send_ticket_matcher = on_command("send", rule=is_engineer & to_me(), aliases={
                                  "留言"}, priority=10, block=True)
 op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule=to_me() & is_backend,
                                        permission=SUPERUSER, priority=10, block=True)
+who_asked_matcher = on_keyword({"我恨你"},rule=is_engineer,priority=11)
 
 
 # 回复客户消息
@@ -526,3 +527,8 @@ async def check_backend_ticket(id: str, bot: Bot, matcher: Matcher, session: asy
         await matcher.finish("工单不存在")
     else:
         return ticket
+
+# 谁问你了
+@who_asked_matcher.handle()
+async def who_asked(bot:Bot,event:MessageEvent):
+    await who_asked_matcher.finish("谁问你了")
