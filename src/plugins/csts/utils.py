@@ -78,23 +78,20 @@ async def print_ticket(ticket_id: int) -> Message:
         return Message(msg)
 
 
-async def print_ticket_info(ticket_id: int) -> list[Message]:
-    session = get_session()
+async def print_ticket_info(ticket:Ticket) -> list[Message]:
     msgs = []
-    async with session.begin():
-        ticket = await session.get(Ticket, ticket_id)
-        if not ticket:
-            # no ticket record
-            raise (ValueError)
-        ticket_id = ticket.id
-        ticket_status = ticket.status
-        ticket_begin_at = cst.localize(ticket.begin_at)
-        ticket_end_at = None if not ticket.end_at else cst.localize(
+    if not ticket:
+        # no ticket record
+        raise (ValueError)
+    ticket_id = ticket.id
+    ticket_status = ticket.status
+    ticket_begin_at = cst.localize(ticket.begin_at)
+    ticket_end_at = None if not ticket.end_at else cst.localize(
             ticket.end_at)
-        ticket_customer_id = ticket.customer_id
-        ticket_engineer_id = ticket.engineer_id
-        ticket_scheduled_time = ticket.scheduled_time
-        ticket_description = ticket.description
+    ticket_customer_id = ticket.customer_id
+    ticket_engineer_id = ticket.engineer_id
+    ticket_scheduled_time = ticket.scheduled_time
+    ticket_description = ticket.description
     msgs.append(Message(f"工单号: {ticket_id:0>3}"))
     msgs.append(Message(f"状态: {ticket_status}"))
     msgs.append(
