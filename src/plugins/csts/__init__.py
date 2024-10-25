@@ -1,11 +1,11 @@
 from nonebot_plugin_apscheduler import scheduler
 from typing import Annotated
-from nonebot import get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
+from nonebot import  get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
 from nonebot.matcher import Matcher
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message,MessageSegment
+from nonebot.adapters.onebot.v11 import Bot,Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message,MessageSegment
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me, ArgumentParser, Namespace
-from nonebot.permission import SUPERUSER
+from nonebot.permission import SUPERUSER,Permission,User
 from nonebot.params import CommandArg, ShellCommandArgs, ArgPlainText
 from nonebot.exception import ParserExit
 from datetime import datetime, timedelta, UTC
@@ -308,6 +308,26 @@ async def _(matcher: Matcher, session: async_scoped_session, args: Message = Com
             await matcher.finish("工单不存在")
 
 
+async def limit_mathcer_backend_bot(event:Event):
+    if plugin_config.backend_bot:
+        if event.self_id == int(plugin_config.backend_bot):
+            return True
+        else:
+            return False
+    else:
+        return True
+    
+@close_ticket_matcher.permission_updater
+@force_close_ticket_mathcer.permission_updater
+@untake_ticket_matcher.permission_updater
+@get_ticket_matcher.permission_updater
+@take_ticket_matcher.permission_updater
+@scheduled_ticket_matcher.permission_updater
+@send_ticket_matcher.permission_updater
+async def _(event: Event, matcher: Matcher) -> Permission:
+    return Permission(User.from_event(event=event,perm=Permission(limit_mathcer_backend_bot)))
+
+
 # 获取某一单的信息
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
@@ -520,8 +540,6 @@ async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "
 
 
 async def check_backend_ticket(id: str, bot: Bot, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
-    if bot.self_id != get_backend_bot(bot).self_id:
-        await matcher.finish()
     ticket = await session.get(Ticket, id)
     if not ticket:
         await matcher.finish("工单不存在")
