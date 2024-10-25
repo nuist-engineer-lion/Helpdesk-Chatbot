@@ -309,7 +309,7 @@ async def _(matcher: Matcher, session: async_scoped_session, args: Message = Com
 
 # 获取某一单的信息
 @get_ticket_matcher.got("id", prompt="单号？")
-async def get_ticket(bot: Bot, matcher:Matcher,event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
+async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
     await get_ticket_matcher.finish()
@@ -317,7 +317,7 @@ async def get_ticket(bot: Bot, matcher:Matcher,event: MessageEvent, session: asy
 
 # 处理接单
 @take_ticket_matcher.got("id", prompt="单号？")
-async def take_ticket(bot: Bot, matcher:Matcher ,event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
+async def take_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     engineer_id = event.get_user_id()
     if not ticket:
@@ -339,7 +339,7 @@ async def take_ticket(bot: Bot, matcher:Matcher ,event: MessageEvent, session: a
 
 # 处理放单
 @untake_ticket_matcher.got("id", prompt="单号？")
-async def untake_ticket(bot: Bot, matcher:Matcher , event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
+async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     engineer_id = event.get_user_id()
     if not ticket:
@@ -364,7 +364,7 @@ async def untake_ticket(bot: Bot, matcher:Matcher , event: MessageEvent, session
 # 处理关单
 @close_ticket_matcher.got("id", prompt="单号？")
 @close_ticket_matcher.got("describe", prompt="请描述工单")
-async def close_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
+async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                        describe: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     engineer_id = event.get_user_id()
@@ -395,7 +395,7 @@ async def close_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, session: a
 # 强制关单
 @force_close_ticket_mathcer.got("id", prompt="单号？")
 @force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")
-async def force_close_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
+async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                              describe: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     engineer_id = event.get_user_id()
@@ -415,7 +415,7 @@ async def force_close_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, sess
 # 处理预定
 @scheduled_ticket_matcher.got("id", prompt="单号？")
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
-async def scheduled_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
+async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                            scheduled_time: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     if ticket.status == Status.CLOSED:
@@ -435,7 +435,7 @@ async def scheduled_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, sessio
 # 留言处理
 @send_ticket_matcher.got("id", "单号？")
 @send_ticket_matcher.got("send_msg", "留言内容？")
-async def send_ticket(bot: Bot,matcher:Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
+async def send_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                       send_msg: str = ArgPlainText()):
     ticket = await check_backend_ticket(id, bot, matcher, session)
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=send_msg)
