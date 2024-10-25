@@ -240,7 +240,7 @@ async def _(matcher: Matcher,session: async_scoped_session, args: Message = Comm
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     if bot.self_id != get_backend_bot(bot).self_id:
-        await get_ticket_matcher.finish("工单不存在")
+        await get_ticket_matcher.finish()
     await send_forward_msg(get_backend_bot(bot),await print_ticket_info(int(id)),event=event)
     await get_ticket_matcher.finish()
 
@@ -248,7 +248,7 @@ async def get_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessio
 @take_ticket_matcher.got("id", prompt="单号？")
 async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session,id: str = ArgPlainText()):
     if bot.self_id != get_backend_bot(bot).self_id:
-        await take_ticket_matcher.finish("工单不存在")
+        await take_ticket_matcher.finish()
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
     if not ticket:
@@ -269,7 +269,7 @@ async def take_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
 @untake_ticket_matcher.got("id", prompt="单号？")
 async def untake_ticket(bot: Bot, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     if bot.self_id != get_backend_bot(bot).self_id:
-        await untake_ticket_matcher.finish("工单不存在")
+        await untake_ticket_matcher.finish()
     engineer_id = event.get_user_id()
     ticket = await session.get(Ticket, id)
     if not ticket:
