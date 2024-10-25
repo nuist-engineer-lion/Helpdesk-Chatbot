@@ -531,4 +531,4 @@ async def check_backend_ticket(id: str, bot: Bot, matcher: Matcher, session: asy
 # 谁问你了
 @who_asked_matcher.handle()
 async def who_asked(bot:Bot,event:MessageEvent):
-    await who_asked_matcher.finish("谁问你了")
+    await who_asked_matcher.finish(f"谁问你了[CQ:at,qq={event.get_user_id()}]")
