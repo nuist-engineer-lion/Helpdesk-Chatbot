@@ -103,7 +103,7 @@ async def print_ticket_info(ticket_id: int) -> list[Message]:
         msgs.append(
             Message("结束时间: " + ticket_end_at.strftime("%Y-%m-%d %H:%M:%S")))
     if ticket_scheduled_time:
-        msgs.append(Message("结束时间: " + ticket_scheduled_time))
+        msgs.append(Message("预约时间: " + ticket_scheduled_time))
     msgs.append(Message(f"机主名片[CQ:contact,type=qq,id={ticket_customer_id}]"))
     if ticket_engineer_id:
         msgs.append(
