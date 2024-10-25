@@ -418,6 +418,7 @@ async def force_close_ticket(bot: Bot, event: MessageEvent, session: async_scope
 
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=await print_ticket(ticket_id))
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id),message=f"感谢您的支持与信任，再见。")
     await force_close_ticket_mathcer.finish(f"强制关单{ticket_id}")
 
 
