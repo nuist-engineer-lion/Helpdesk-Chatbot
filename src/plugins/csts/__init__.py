@@ -2,7 +2,7 @@ from nonebot_plugin_apscheduler import scheduler
 from typing import Annotated
 from nonebot import get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
 from nonebot.matcher import Matcher
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message,MessageSegment
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me, ArgumentParser, Namespace
 from nonebot.permission import SUPERUSER
@@ -531,4 +531,4 @@ async def check_backend_ticket(id: str, bot: Bot, matcher: Matcher, session: asy
 # 谁问你了
 @who_asked_matcher.handle()
 async def who_asked(bot:Bot,event:MessageEvent):
-    await who_asked_matcher.finish(f"谁问你了[CQ:at,qq={event.get_user_id()}]")
+    await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}]谁问你了"))
