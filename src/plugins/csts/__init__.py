@@ -150,6 +150,8 @@ who_asked_matcher = on_keyword(
 # 回复客户消息
 @customer_message.handle()
 async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: async_scoped_session):
+    if event.message.extract_plain_text() in "请求添加你为好友":
+        await customer_message.finish()
     customer_id = event.get_user_id()
     # 根据客户id获取最新的未关闭工单
     ticket = await session.execute(
