@@ -1,13 +1,14 @@
 from nonebot_plugin_apscheduler import scheduler
 from typing import Annotated
-from nonebot import get_bots, logger, on_keyword, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
+from nonebot import get_bots, logger, on_keyword, on_notice, on_shell_command, require, get_bot, get_plugin_config, on_message, on_command
 from nonebot.matcher import Matcher
-from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment
+from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment, FriendRequestEvent
 from nonebot.plugin import PluginMetadata
 from nonebot.rule import to_me, ArgumentParser, Namespace
 from nonebot.permission import SUPERUSER, Permission, User
 from nonebot.params import CommandArg, ShellCommandArgs, ArgPlainText
 from nonebot.exception import ParserExit
+from nonebot.typing import T_State
 from datetime import datetime, timedelta, UTC
 from nonebot_plugin_orm import async_scoped_session, get_session
 from sqlalchemy import select
@@ -563,3 +564,12 @@ async def get_db_ticket(id: str, matcher: Matcher, session: async_scoped_session
 # 谁问你了
 async def who_asked(bot: Bot, event: MessageEvent):
     await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}]谁问你了"))
+
+
+# 处理好友添加请求
+async def _friend_request(bot: Bot, event: Event, state: T_State) -> bool:
+    return isinstance(event, FriendRequestEvent)
+friend_request = on_notice(_friend_request, priority=12, block=True)
+@friend_request.handle()
+async def _(bot:Bot,event: FriendRequestEvent):
+    await event.approve(bot)
