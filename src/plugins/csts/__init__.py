@@ -94,6 +94,7 @@ async def is_customer(event: PrivateMessageEvent) -> bool:
 Types_Ticket = {
     "活动的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "未接的": lambda id: select(Ticket).filter(Ticket.status == Status.PENDING).order_by(Ticket.begin_at.desc()),
+    "预约的": lambda id: select(Ticket).filter(Ticket.status == Status.SCHEDULED).order_by(Ticket.begin_at.desc()),
     "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id,
                                                     Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
