@@ -126,7 +126,8 @@ engineer_parser_list = engineer_parser_sub.add_parser("list", help="列出全部
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
-help_matcher = on_command("help",rule=is_engineer & to_me(),aliases={"帮助"},priority=10,block=True)
+help_matcher = on_command("help", rule=is_engineer & to_me(), aliases={
+                          "帮助"}, priority=10, block=True)
 list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer & to_me(), aliases={"列出"},
                                        priority=10, block=True)
 get_ticket_matcher = on_command("get", rule=is_engineer & to_me(), aliases={
@@ -137,6 +138,8 @@ untake_ticket_matcher = on_command(
     "untake", rule=is_engineer & to_me(), aliases={"放单"}, priority=10, block=True)
 close_ticket_matcher = on_command("close", rule=is_engineer & to_me(), aliases={
                                   "关单"}, priority=10, block=True)
+qid_close_ticket_matcher = on_command(
+    "qclose", rule=is_engineer & to_me(), aliases={"qq关单"}, priority=10, block=True)
 force_close_ticket_mathcer = on_command("fclose", rule=is_engineer & to_me(), aliases={"强制关单"}, priority=10,
                                         block=True)
 scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预约"}, priority=10,
@@ -294,10 +297,11 @@ async def ticket_check():
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish("输入 help 或 帮助 来获取帮助")
 
+
 @help_matcher.handle()
 async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-        "指令列表：\n[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预约)|send(留言)|engineers(管理员操作)]")
+        "指令列表：\n[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|qclose(qq关单)|fclose(强制关单)|scheduled(预约)|send(留言)|engineers(管理员操作)]")
 
 
 # 所有指定一个id函数共同进行处理
@@ -335,7 +339,9 @@ async def limit_mathcer_backend_bot(event: Event):
 @take_ticket_matcher.permission_updater
 @scheduled_ticket_matcher.permission_updater
 @send_ticket_matcher.permission_updater
-# 群内确认相应者是后端
+@qid_close_ticket_matcher.permission_updater
+@help_matcher.permission_updater
+# 群内确认响应者是后端
 async def _(event: Event, matcher: Matcher) -> Permission:
     return Permission(User.from_event(event=event, perm=Permission(limit_mathcer_backend_bot)))
 
@@ -413,11 +419,30 @@ async def close_ticket_front(bot: Bot, matcher: Matcher, event: MessageEvent, se
     elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
         await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
 
+@qid_close_ticket_matcher.got("qid",prompt="qq号？")
+async def qid_close_ticket_front(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
+    ticket = (await session.execute(select(Ticket).where(Ticket.customer_id==id).where(Ticket.status!=Status.CLOSED))).scalar_one_or_none()
+    if not ticket:
+        await matcher.finish("不存在活动的工单")
+    engineer_id = event.get_user_id()
+    if ticket.status == Status.SCHEDULED:
+        ticket.engineer_id = engineer_id
+        await matcher.send("完成本预定")
+    elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
+        await matcher.finish("您未接单或不是该工单的工程师")
 
 @close_ticket_matcher.got("describe", prompt="请描述工单")
+@qid_close_ticket_matcher.got("describe",prompt="请描述工单")
 async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
-                       describe: str = ArgPlainText()):
-    ticket = await get_db_ticket(id, matcher, session)
+                       describe: str = ArgPlainText(),qid:str=ArgPlainText()):
+    if qid:
+        ticket = (await session.execute(select(Ticket).where(Ticket.customer_id==id).where(Ticket.status!=Status.CLOSED))).scalar_one_or_none()
+        if not ticket:
+            await matcher.finish("不存在活动的工单")
+    elif id:
+        ticket = await get_db_ticket(id, matcher, session)
+    else:
+        await matcher.finish("怎么会这样？")
     engineer_id = event.get_user_id()
     ticket.description = describe
     ticket.status = Status.CLOSED
@@ -434,7 +459,7 @@ async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session:
     # 通知接单群
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}已处理完{id}！")
-    await close_ticket_matcher.finish()
+    await matcher.finish()
 
 
 # 强制关单
@@ -578,6 +603,8 @@ async def who_asked(bot: Bot, event: MessageEvent):
 async def _friend_request(bot: Bot, event: Event, state: T_State) -> bool:
     return isinstance(event, FriendRequestEvent)
 friend_request = on_notice(_friend_request, priority=12, block=True)
+
+
 @friend_request.handle()
-async def _(bot:Bot,event: FriendRequestEvent):
+async def _(bot: Bot, event: FriendRequestEvent):
     await event.approve(bot)
