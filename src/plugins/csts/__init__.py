@@ -465,7 +465,7 @@ async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session:
     await session.refresh(ticket)
 
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
-                                              message=await print_ticket(int(id)))
+                                              message=await print_ticket(ticket))
     # 通知客户
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id),
                                               message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
@@ -489,7 +489,7 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
     await session.refresh(ticket)
 
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
-                                              message=await print_ticket(ticket.id))
+                                              message=await print_ticket(ticket))
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"感谢您的支持与信任，再见。")
     await force_close_ticket_mathcer.finish(f"强制关单{ticket.id}")
 
@@ -526,7 +526,7 @@ async def send_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: 
 @search_qq_matcher.got("qid", "qq号？")
 async def search_qq(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, qid: str = ArgPlainText()):
     ticket = await qq_get_db_ticket(qid,matcher,session)
-    await matcher.finish(await print_ticket(ticket.id))
+    await matcher.finish(await print_ticket(ticket))
 
 @op_engineer_matcher.handle()
 async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,
@@ -591,7 +591,7 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     else:
         msgs = []
         for ticket in tickets:
-            msgs.append(await print_ticket(ticket.id))
+            msgs.append(await print_ticket(ticket))
         await send_forward_msg(get_backend_bot(bot), msgs=msgs, event=event)
 
 

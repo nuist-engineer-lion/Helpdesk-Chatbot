@@ -57,25 +57,22 @@ async def send_forward_msg(
             )
 
 
-async def print_ticket(ticket_id: int) -> Message:
-    session = get_session()
-    async with session.begin():
-        ticket = await session.get(Ticket, ticket_id)
-        if not ticket:
-            # no ticket record
-            raise (ValueError)
-        msg = f'工单:{ticket.id}\n状态:{ticket.status}\n机主:{ticket.customer_id}\n'
-        if ticket.engineer_id:
-            msg = msg+f'工程师:{ticket.engineer_id}\n'
-        if ticket.begin_at:
-            msg = msg+f'创建时间:{ticket.begin_at.strftime("%Y-%m-%d %H:%M:%S")}\n'
-        if ticket.end_at:
-            msg = msg+f'结束时间:{ticket.end_at.strftime("%Y-%m-%d %H:%M:%S")}\n'
-        if ticket.scheduled_time:
-            msg = msg+f'预约时间:{ticket.scheduled_time}\n'
-        if ticket.description:
-            msg = msg+f'描述:{ticket.description}'
-        return Message(msg)
+async def print_ticket(ticket: Ticket) -> Message:
+    if not ticket:
+        # no ticket record
+        raise (ValueError)
+    msg = f'工单:{ticket.id}\n状态:{ticket.status}\n机主:{ticket.customer_id}\n'
+    if ticket.engineer_id:
+        msg = msg+f'工程师:{ticket.engineer_id}\n'
+    if ticket.begin_at:
+        msg = msg+f'创建时间:{ticket.begin_at.strftime("%Y-%m-%d %H:%M:%S")}\n'
+    if ticket.end_at:
+        msg = msg+f'结束时间:{ticket.end_at.strftime("%Y-%m-%d %H:%M:%S")}\n'
+    if ticket.scheduled_time:
+        msg = msg+f'预约时间:{ticket.scheduled_time}\n'
+    if ticket.description:
+        msg = msg+f'描述:{ticket.description}'
+    return Message(msg)
 
 
 async def print_ticket_info(ticket:Ticket) -> list[Message]:
