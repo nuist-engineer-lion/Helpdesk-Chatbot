@@ -125,6 +125,7 @@ engineer_parser_list = engineer_parser_sub.add_parser("list", help="列出全部
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
 engineer_message = on_message(rule=is_engineer & to_me(), priority=100)
+help_matcher = on_command("help",rule=is_engineer & to_me(),aliases={"帮助"},priority=10,block=True)
 list_ticket_matcher = on_shell_command("list", parser=list_parser, rule=is_engineer & to_me(), aliases={"列出"},
                                        priority=10, block=True)
 get_ticket_matcher = on_command("get", rule=is_engineer & to_me(), aliases={
@@ -290,6 +291,10 @@ async def ticket_check():
 # 捕获未能解析的工程师命令
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
+    await engineer_message.finish("输入 help 或 帮助 来获取帮助")
+
+@help_matcher.handle()
+async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
         "指令列表：\n[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预约)|send(留言)|engineers(管理员操作)]")
 
