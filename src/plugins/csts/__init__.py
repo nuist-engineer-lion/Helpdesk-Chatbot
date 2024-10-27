@@ -291,7 +291,7 @@ async def ticket_check():
 @engineer_message.handle()
 async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-        "指令列表：\n[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预定)|send(留言)|engineers(管理员操作)]")
+        "指令列表：\n[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|fclose(强制关单)|scheduled(预约)|send(留言)|engineers(管理员操作)]")
 
 
 # 所有指定一个id函数共同进行处理
