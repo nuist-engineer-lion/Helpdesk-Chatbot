@@ -182,7 +182,10 @@ async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainT
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await get_db_ticket(id, matcher, session)
     await matcher.send(await print_ticket(ticket))
-    await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), event=event)
+    try:
+        await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), event=event)
+    except:
+        await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),event=event)
 
 
 # 处理接单
@@ -229,7 +232,7 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
         await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
                                    target_group_id=plugin_config.notify_group)
     except:
-        pass
+        await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
@@ -432,7 +435,7 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
                 await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
                                            target_group_id=plugin_config.notify_group)
             except:
-                pass
+                await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
     else:
         msgs = []
         for ticket in tickets:

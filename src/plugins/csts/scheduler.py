@@ -30,7 +30,10 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = await print_ticket(ticket))
-            await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
+            try:
+                await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
+            except:
+                await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
 
             # 不要告诉机主转发出去了
             # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
@@ -52,6 +55,9 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = await print_ticket(ticket))
-            await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
+            try:
+                await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
+            except:
+                await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
             # 不要告诉机主他在催单
             # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
