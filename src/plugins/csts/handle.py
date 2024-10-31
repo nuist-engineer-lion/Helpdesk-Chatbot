@@ -97,8 +97,8 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
             target_user_id=ticket.engineer_id
         )
     elif ticket.status == Status.SCHEDULED:
-        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=f"预定过的{ticket.id} {ticket.customer_id}说:")
-        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=event.message)
+        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"预定过的{ticket.id} {ticket.customer_id}说:")
+        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=event.message)
 
 
 # 捕获未能解析的工程师命令
@@ -227,7 +227,7 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
     await matcher.send(await print_ticket(ticket))
     try:
         await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
-                           target_group_id=plugin_config.notify_group)
+                                   target_group_id=plugin_config.notify_group)
     except:
         pass
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
@@ -242,6 +242,7 @@ async def close_ticket_front(bot: Bot, matcher: Matcher, event: MessageEvent, se
     engineer_id = event.get_user_id()
     if ticket.status == Status.SCHEDULED:
         ticket.engineer_id = engineer_id
+        await session.commit()
         await close_ticket_matcher.send("完成本预定")
     elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
         await close_ticket_matcher.finish("您未接单或不是该工单的工程师")
@@ -253,18 +254,42 @@ async def qid_close_ticket_front(bot: Bot, matcher: Matcher, event: MessageEvent
     engineer_id = event.get_user_id()
     if ticket.status == Status.SCHEDULED:
         ticket.engineer_id = engineer_id
+        await session.commit()
         await matcher.send("完成本预定")
     elif ticket.status != Status.PROCESSING or ticket.engineer_id != engineer_id:
         await matcher.finish("您未接单或不是该工单的工程师")
 
 
-@close_ticket_matcher.got("describe", prompt="请描述工单")
 @qid_close_ticket_matcher.got("describe", prompt="请描述工单")
-async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
-                       describe: str = ArgPlainText(), qid: str = ArgPlainText()):
+async def qclose_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, qid: str = ArgPlainText(),
+                        describe: str = ArgPlainText()):
     if qid:
         ticket = await qq_get_db_ticket(qid, matcher, session)
-    elif id:
+    else:
+        await matcher.finish("怎么会这样？")
+    engineer_id = event.get_user_id()
+    ticket.description = describe
+    ticket.status = Status.CLOSED
+    ticket.end_at = datetime.fromtimestamp(event.time, cst)
+
+    await session.commit()
+    await session.refresh(ticket)
+
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
+                                              message=await print_ticket(ticket))
+    # 通知客户
+    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id),
+                                              message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
+    # 通知接单群
+    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
+                                              message=f"工程师{engineer_id}已处理完{id}！")
+    await matcher.finish()
+
+
+@close_ticket_matcher.got("describe", prompt="请描述工单")
+async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
+                       describe: str = ArgPlainText()):
+    if id:
         ticket = await get_db_ticket(id, matcher, session)
     else:
         await matcher.finish("怎么会这样？")
@@ -405,7 +430,7 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
             await list_ticket_matcher.send(await print_ticket(ticket))
             try:
                 await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
-                           target_group_id=plugin_config.notify_group)
+                                           target_group_id=plugin_config.notify_group)
             except:
                 pass
     else:
