@@ -68,9 +68,6 @@ def is_backend(event: MessageEvent) -> bool:
 
 
 async def is_engineer(event: MessageEvent) -> bool:
-    # 避免自己给自己发消息反复触发
-    if event.get_user_id() in get_bots():
-        return False
     # 从后端工程师发来的消息
     if is_backend(event):
         if isinstance(event, GroupMessageEvent):
@@ -152,6 +149,7 @@ op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule
                                        permission=SUPERUSER, priority=10, block=True)
 who_asked_matcher = on_keyword(
     {"我恨你", "I hate you"}, rule=is_engineer, priority=11)
+
 
 
 # 回复客户消息
