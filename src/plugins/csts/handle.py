@@ -10,11 +10,11 @@ from nonebot import logger, on_notice
 from asyncio import sleep
 from .config import plugin_config
 from pytz import timezone
-from .utils import send_forward_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot
+from .utils import send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
 from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment, FriendRequestEvent
-from .model import Engineer,Ticket
+from .model import Engineer, Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
 
@@ -48,7 +48,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
                 ):
                     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=Message(f"{customer_id}在工单{last_ticket.id}结束后说:"))
                     # 将关单时间设为当前时间，通知群聊并结束处理
-                    await send_forward_msg(get_backend_bot(bot),
+                    await send_combined_msg(get_backend_bot(bot),
                                            [
                         event.message
                     ],
@@ -93,7 +93,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
     elif ticket.status == Status.PROCESSING:
         # 转发消息给工程师
         # is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
-        await send_forward_msg(
+        await send_combined_msg(
             get_backend_bot(bot),
             [
                 Message("接收到来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),
@@ -103,7 +103,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
             target_user_id=ticket.engineer_id
         )
     elif ticket.status == Status.SCHEDULED:
-        await send_forward_msg(
+        await send_combined_msg(
             get_backend_bot(bot),
             [
                 Message("接收到已经预约的来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),
@@ -194,7 +194,7 @@ async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainT
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await get_db_ticket(id, matcher, session)
-    await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
+    await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
     await get_ticket_matcher.finish()
 
 
@@ -237,7 +237,7 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
     await get_front_bot(bot).send_private_msg(user_id=customer_id,
                                               message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket),
+    await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket),
                            target_group_id=plugin_config.notify_group)
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
@@ -386,7 +386,7 @@ async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,
         msg = []
         for engineer in engineers:
             msg += Message(engineer.engineer_id)
-        await send_forward_msg(get_backend_bot(bot), msgs=msg, event=event)
+        await send_combined_msg(get_backend_bot(bot), msgs=msg, event=event)
     else:
         await op_engineer_matcher.finish(engineer_parser.format_usage())
 
@@ -409,12 +409,12 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
         await list_ticket_matcher.finish("没有")
     if args.a:
         for ticket in tickets:
-            await send_forward_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
+            await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
     else:
         msgs = []
         for ticket in tickets:
             msgs.append(await print_ticket(ticket))
-        await send_forward_msg(get_backend_bot(bot), msgs=msgs, event=event)
+        await send_combined_msg(get_backend_bot(bot), msgs=msgs, event=event)
 
 
 async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "请输入正确的工单号") -> int:

@@ -13,7 +13,7 @@ from nonebot import get_bot, require
 cst = timezone('Asia/Shanghai')
 
 
-async def send_forward_msg(
+async def send_combined_msg(
         bot: Bot,
         msgs: list[Message],
         event: Optional[MessageEvent] = None,
