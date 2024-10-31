@@ -10,7 +10,7 @@ from nonebot import logger, on_notice
 from asyncio import sleep
 from .config import plugin_config
 from pytz import timezone
-from .utils import send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot
+from .utils import send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, send_forward_message, print_ticket_history
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
 from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment, FriendRequestEvent
@@ -194,8 +194,8 @@ async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainT
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await get_db_ticket(id, matcher, session)
-    await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
-    await get_ticket_matcher.finish()
+    await send_forward_message(get_backend_bot(bot), await print_ticket_history(ticket), event=event)
+    await matcher.finish(await print_ticket(ticket))
 
 
 # 处理接单
