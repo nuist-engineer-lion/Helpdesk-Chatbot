@@ -335,9 +335,11 @@ async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, sess
 
 
 # 留言处理
-@send_ticket_matcher.got("send_msg", "留言内容？")
+@send_ticket_matcher.got("send_msg", "留言内容？(输入一个q退出)")
 async def send_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                       send_msg: str = ArgPlainText()):
+    if send_msg == 'q':
+        await matcher.finish()
     ticket = await get_db_ticket(id, matcher, session)
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=send_msg)
     await matcher.finish("已转发留言")
