@@ -17,6 +17,8 @@ from pytz import timezone
 from .config import Config
 from .model import Ticket, Status, Engineer
 from .utils import send_forward_msg, print_ticket_info, print_ticket
+from . import record
+
 
 require("nonebot_plugin_apscheduler")
 
