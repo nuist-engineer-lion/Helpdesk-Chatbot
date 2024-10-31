@@ -97,15 +97,8 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
             target_user_id=ticket.engineer_id
         )
     elif ticket.status == Status.SCHEDULED:
-        await send_combined_msg(
-            get_backend_bot(bot),
-            [
-                Message("接收到已经预约的来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),
-                Message(f"[CQ:contact,type=qq,id={customer_id}]"),
-                event.message
-            ],
-            target_group_id=plugin_config.notify_group
-        )
+        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=f"预定过的{ticket.id} {ticket.customer_id}说:")
+        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=event.message")
 
 
 # 捕获未能解析的工程师命令
