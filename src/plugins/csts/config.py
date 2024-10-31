@@ -1,3 +1,4 @@
+from nonebot import get_plugin_config
 from pydantic import BaseModel
 from typing import List
 
@@ -22,3 +23,5 @@ class Config(BaseModel):
     first_reply_delay: int = 5  # 秒，第一次回复延迟时间
     # second_reply: str = "我们已经收到您的问题，正在为您联系工程师，请稍等片刻。"# 第二次回复消息
     # third_reply: str = "正在为您加急联系中，请稍等片刻。"# 第三次回复消息
+
+plugin_config = get_plugin_config(Config)

@@ -5,15 +5,12 @@ from nonebot_plugin_chatrecorder import get_message_records
 from typing import Optional
 from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent, Message, GroupMessageEvent
 from nonebot.internal.adapter.bot import Bot
-
-from .config import Config
+from .config import plugin_config
 from .model import Ticket
-from nonebot import get_plugin_config, require
-require("nonebot_plugin_chatrecorder")
+from nonebot import get_bot, require
+
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
-
-plugin_config = get_plugin_config(Config)
 
 
 async def send_forward_msg(
@@ -75,7 +72,7 @@ async def print_ticket(ticket: Ticket) -> Message:
     return Message(msg)
 
 
-async def print_ticket_info(ticket:Ticket) -> list[Message]:
+async def print_ticket_info(ticket: Ticket) -> list[Message]:
     msgs = []
     if not ticket:
         # no ticket record
@@ -84,7 +81,7 @@ async def print_ticket_info(ticket:Ticket) -> list[Message]:
     ticket_status = ticket.status
     ticket_begin_at = cst.localize(ticket.begin_at)
     ticket_end_at = None if not ticket.end_at else cst.localize(
-            ticket.end_at)
+        ticket.end_at)
     ticket_customer_id = ticket.customer_id
     ticket_engineer_id = ticket.engineer_id
     ticket_scheduled_time = ticket.scheduled_time
@@ -124,3 +121,17 @@ async def print_ticket_info(ticket:Ticket) -> list[Message]:
                 msgs.append(Message("---------Customer---------"))
         msgs.append(record.message)
     return msgs
+
+
+def get_backend_bot(bot):
+    if plugin_config.backend_bot:
+        return get_bot(str(plugin_config.backend_bot))
+    else:
+        return bot
+
+
+def get_front_bot(bot):
+    if plugin_config.front_bot:
+        return get_bot(str(plugin_config.front_bot))
+    else:
+        return bot
