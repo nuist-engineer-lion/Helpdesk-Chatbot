@@ -98,7 +98,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         )
     elif ticket.status == Status.SCHEDULED:
         await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=f"预定过的{ticket.id} {ticket.customer_id}说:")
-        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=event.message")
+        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message=event.message)
 
 
 # 捕获未能解析的工程师命令
