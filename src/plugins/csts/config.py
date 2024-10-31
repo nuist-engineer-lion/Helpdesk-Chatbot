@@ -11,7 +11,7 @@ class Config(BaseModel):
     backend_bot: str | int | None = None
 
     ticket_creating_alive_time: int = 60  # 秒，工单创建过程的生存期（最新消息后过该时间则完成工单创建）
-    ticket_alarming_alive_time: int = 20  # 秒，工单报警过程的生存期（最新消息后过该时间则进行工单报警）
+    ticket_alarming_alive_time: int = 60  # 秒，工单报警过程的生存期（最新消息后过该时间则进行工单报警）
     ticket_checking_interval: int = 30  # 秒，工单检查间隔
     ticket_create_interval: int = 30  # 秒，创建工单检查间隔
 
