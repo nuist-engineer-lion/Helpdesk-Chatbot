@@ -62,15 +62,16 @@ async def send_forward_message(
         target_user_id: Optional[str | int] = None,
         block_event: bool = False,):
     def to_node(msg: MessageRecord):
+        print(msg.message_id,msg.message)
         return {"type": "node", "data": {"id": msg.message_id}}
     message_nodes = [to_node(msg) for msg in msgs]
     if target_group_id:
         await bot.call_api(
-        "send_forward_msg", group_id=target_group_id,message=message_nodes
+        "send_forward_msg", group_id=target_group_id,messages=message_nodes
     )
     if target_user_id:
         await bot.call_api(
-        "send_forward_msg", group_id=target_user_id,message=message_nodes
+        "send_forward_msg", user_id=target_user_id,messages=message_nodes
     )
     if not block_event and event:
         if isinstance(event, PrivateMessageEvent):

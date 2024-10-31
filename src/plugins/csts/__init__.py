@@ -6,9 +6,10 @@ require("nonebot_plugin_apscheduler")
 require("nonebot_plugin_chatrecorder")
 
 from .config import Config
-from . import handle
-from . import record
-from . import scheduler
+from .scheduler import *
+from .handle import *
+from .record import *
+
 
 __plugin_meta__ = PluginMetadata(
     name="CSTS",

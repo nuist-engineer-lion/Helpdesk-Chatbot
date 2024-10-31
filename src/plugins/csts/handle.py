@@ -47,13 +47,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
                     seconds=plugin_config.ticket_create_interval
                 ):
                     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=Message(f"{customer_id}在工单{last_ticket.id}结束后说:"))
-                    # 将关单时间设为当前时间，通知群聊并结束处理
-                    await send_combined_msg(get_backend_bot(bot),
-                                           [
-                        event.message
-                    ],
-                        target_group_id=plugin_config.notify_group)
-                    await customer_message.finish()
+                    await customer_message.finish(event.message)
 
         # 如果没有则直接创建
         # 创建工单
@@ -194,8 +188,8 @@ async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainT
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await get_db_ticket(id, matcher, session)
-    await send_forward_message(get_backend_bot(bot), await print_ticket_history(ticket), event=event)
-    await matcher.finish(await print_ticket(ticket))
+    await matcher.send(await print_ticket(ticket))
+    await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), event=event)
 
 
 # 处理接单
@@ -237,8 +231,12 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
     await get_front_bot(bot).send_private_msg(user_id=customer_id,
                                               message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket),
+    await matcher.send(await print_ticket(ticket))
+    try:
+        await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
                            target_group_id=plugin_config.notify_group)
+    except:
+        pass
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
@@ -411,7 +409,12 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
         await list_ticket_matcher.finish("没有")
     if args.a:
         for ticket in tickets:
-            await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
+            await list_ticket_matcher.send(await print_ticket(ticket))
+            try:
+                await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
+                           target_group_id=plugin_config.notify_group)
+            except:
+                pass
     else:
         msgs = []
         for ticket in tickets:
