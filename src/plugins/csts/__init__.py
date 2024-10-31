@@ -1,13 +1,14 @@
 from nonebot import require
 from nonebot.plugin import PluginMetadata
-from .config import Config
-from . import handle
-# from . import record
-from . import scheduler
 
 require("nonebot_plugin_orm")
 require("nonebot_plugin_apscheduler")
 require("nonebot_plugin_chatrecorder")
+
+from .config import Config
+from . import handle
+from . import record
+from . import scheduler
 
 __plugin_meta__ = PluginMetadata(
     name="CSTS",
