@@ -3,7 +3,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from enum import Enum
 from nonebot import require
-require("nonebot_plugin_orm")
 
 
 class Status(Enum):

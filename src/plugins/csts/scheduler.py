@@ -1,12 +1,12 @@
 from nonebot_plugin_apscheduler import scheduler
 from .config import plugin_config
-from nonebot import get_bot,require
-from .utils import get_backend_bot,get_front_bot,send_combined_msg,print_ticket_info
+from nonebot import get_bot, require
+from .utils import get_backend_bot, get_front_bot, send_combined_msg, print_ticket_info
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select
-from .model import Ticket,Status
+from .model import Ticket, Status
 from datetime import datetime
-require("nonebot_plugin_apscheduler")
+
 
 @scheduler.scheduled_job(trigger="interval", seconds=plugin_config.ticket_checking_interval)
 async def ticket_check():
@@ -27,7 +27,7 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await send_combined_msg(backend_bot, await print_ticket_info(ticket),
-                                   target_group_id=plugin_config.notify_group)
+                                    target_group_id=plugin_config.notify_group)
             # 不要告诉机主转发出去了
             # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
         if tickets:
@@ -46,7 +46,7 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await send_combined_msg(backend_bot, await print_ticket_info(ticket),
-                                   target_group_id=plugin_config.notify_group)
+                                    target_group_id=plugin_config.notify_group)
             # 不要告诉机主他在催单
             # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
         if tickets:

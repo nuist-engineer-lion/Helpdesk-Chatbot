@@ -5,6 +5,8 @@ from . import handle
 # from . import record
 from . import scheduler
 
+require("nonebot_plugin_orm")
+require("nonebot_plugin_apscheduler")
 require("nonebot_plugin_chatrecorder")
 
 __plugin_meta__ = PluginMetadata(
