@@ -110,14 +110,13 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
 @help_matcher.handle()
 async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-        """
-        指令列表：(中文英文都可操作)
-        list(列出)|get(获取)|qq(搜索)
-        take(接单)|untake(放单)
-        close(关单)|qclose(qq关单)|fclose(强制关单)
-        scheduled(预约)|设置默认预约
-        send(留言)
-        """
+"""指令列表：(中文英文都可操作)
+list(列出)|get(获取)|qq(搜索)
+take(接单)|untake(放单)
+close(关单)|qclose(qq关单)|fclose(强制关单)
+scheduled(预约)|设置默认预约
+send(留言)
+"""
         )
 
 
