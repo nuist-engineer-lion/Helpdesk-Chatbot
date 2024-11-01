@@ -114,7 +114,7 @@ async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_sess
 list(列出)|get(获取)|qq(搜索)
 take(接单)|untake(放单)
 close(关单)|qclose(qq关单)|fclose(强制关单)
-scheduled(预约)|设置默认预约
+scheduled(预约)|set_schedule(设置默认预约)
 send(留言)
 """
         )
