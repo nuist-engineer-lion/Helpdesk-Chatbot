@@ -1,4 +1,4 @@
-from nonebot import  on_keyword, on_shell_command, on_message, on_command
+from nonebot import on_keyword, on_shell_command, on_message, on_command
 from nonebot.rule import to_me, ArgumentParser
 from nonebot.permission import SUPERUSER
 from sqlalchemy import select
@@ -7,12 +7,12 @@ from .rules import (
     is_backend,
     is_engineer,
 )
-from .model import Ticket,Status
+from .model import Ticket, Status
 
-# 定义命令 
+# 定义命令
 Types_Ticket = {
     "活动的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
-    "未接的": lambda id: select(Ticket).filter(Ticket.status == Status.PENDING).order_by(Ticket.begin_at.desc()),
+    "未接的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED, Ticket.status != Status.SCHEDULED, Ticket.status!=Status.PROCESSING).order_by(Ticket.begin_at.desc()),
     "预约的": lambda id: select(Ticket).filter(Ticket.status == Status.SCHEDULED).order_by(Ticket.begin_at.desc()),
     "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id,
