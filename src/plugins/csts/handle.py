@@ -13,14 +13,17 @@ from pytz import timezone
 from .utils import send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, send_forward_message, print_ticket_history
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
+from nonebot.adapters import MessageTemplate
 from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment, FriendRequestEvent
 from .model import Engineer, Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
 
-default_schedule="周六下午"
+default_schedule = "周六下午"
 
 # 回复客户消息
+
+
 @customer_message.handle()
 async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: async_scoped_session):
     if event.message.extract_plain_text() in "请求添加你为好友":
@@ -110,14 +113,14 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
 @help_matcher.handle()
 async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-"""指令列表：(中文英文都可操作)
+        """指令列表：(中文英文都可操作)
 list(列出)|get(获取)|qq(搜索)
 take(接单)|untake(放单)
 close(关单)|qclose(qq关单)|fclose(强制关单)
 scheduled(预约)|set_schedule(设置默认预约)
 send(留言)
 """
-        )
+    )
 
 
 # 所有指定一个id函数共同进行处理
@@ -193,7 +196,7 @@ async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: a
     try:
         await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), event=event)
     except:
-        await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),event=event)
+        await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
 
 
 # 处理接单
@@ -240,7 +243,7 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
         await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
                                    target_group_id=plugin_config.notify_group)
     except:
-        await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
+        await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), target_group_id=plugin_config.notify_group)
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
@@ -343,11 +346,16 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
 
 
 # 处理预定
-@scheduled_ticket_matcher.got("usedefault",prompt=f"使用默认: {default_schedule} ?(是/否)")
+@scheduled_ticket_matcher.handle()
+async def _(matcher:Matcher):
+    await matcher.send("默认时间："+default_schedule)
+    
+
+@scheduled_ticket_matcher.got("usedefault", prompt=MessageTemplate("使用默认时间?(是/否)"))
 async def schedule_use_default(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, usedefault: str = ArgPlainText()):
     if usedefault == "是":
         matcher.set_arg("scheduled_time", Message(default_schedule))
-        
+
 
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
 async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
@@ -449,7 +457,7 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
                 await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
                                            target_group_id=plugin_config.notify_group)
             except:
-                await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
+                await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), target_group_id=plugin_config.notify_group)
     else:
         msgs = []
         for ticket in tickets:
@@ -458,10 +466,12 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
 
 
 @set_schedule_matcher.handle()
-@set_schedule_matcher.got("time","输入时间地点")
+@set_schedule_matcher.got("time", "输入时间地点")
 async def set_schedule(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, time: str = ArgPlainText()):
-    default_schedule=time
+    global default_schedule
+    default_schedule = time
     await matcher.finish("设置完成")
+
 
 async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "请输入正确的工单号") -> int:
     arg = args.strip()
