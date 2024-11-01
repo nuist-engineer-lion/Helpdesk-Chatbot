@@ -18,9 +18,9 @@ from .model import Engineer, Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
 
+default_schedule="周六下午"
+
 # 回复客户消息
-
-
 @customer_message.handle()
 async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: async_scoped_session):
     if event.message.extract_plain_text() in "请求添加你为好友":
@@ -110,7 +110,15 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
 @help_matcher.handle()
 async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-        "指令列表：\n[list(列出)|get(获取)|take(接单)|untake(放单)|close(关单)|qclose(qq关单)|qq(搜索)|fclose(强制关单)|scheduled(预约)|send(留言)|engineers(管理员操作)]")
+        """
+        指令列表：(中文英文都可操作)
+        list(列出)|get(获取)|qq(搜索)
+        take(接单)|untake(放单)
+        close(关单)|qclose(qq关单)|fclose(强制关单)
+        scheduled(预约)|设置默认预约
+        send(留言)
+        """
+        )
 
 
 # 所有指定一个id函数共同进行处理
@@ -164,6 +172,7 @@ async def limit_mathcer_backend_bot(event: Event):
 @qid_close_ticket_matcher.permission_updater
 @help_matcher.permission_updater
 @search_qq_matcher.permission_updater
+@set_schedule_matcher.permission_updater
 # 群内确认响应者是后端
 async def _(event: Event, matcher: Matcher) -> Permission:
     return Permission(User.from_event(event=event, perm=Permission(limit_mathcer_backend_bot)))
@@ -335,6 +344,12 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
 
 
 # 处理预定
+@scheduled_ticket_matcher.got("usedefault",prompt=f"使用默认: {default_schedule} ?(是/否)")
+async def schedule_use_default(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, usedefault: str = ArgPlainText()):
+    if usedefault == "是":
+        matcher.set_arg("scheduled_time", Message(default_schedule))
+        
+
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
 async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText(),
                            scheduled_time: str = ArgPlainText()):
@@ -443,6 +458,12 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
         await send_combined_msg(get_backend_bot(bot), msgs=msgs, event=event)
 
 
+@set_schedule_matcher.handle()
+@set_schedule_matcher.got("time","输入时间地点")
+async def set_schedule(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, time: str = ArgPlainText()):
+    default_schedule=time
+    await matcher.finish("设置完成")
+
 async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "请输入正确的工单号") -> int:
     arg = args.strip()
     try:
@@ -471,7 +492,7 @@ async def qq_get_db_ticket(qid: str, matcher: Matcher, session: async_scoped_ses
 @who_asked_matcher.handle()
 # 谁问你了
 async def who_asked(bot: Bot, event: MessageEvent):
-    await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}]谁问你了"))
+    await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}] 谁问你了"))
 
 
 # 处理好友添加请求

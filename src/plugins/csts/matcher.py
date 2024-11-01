@@ -12,7 +12,7 @@ from .model import Ticket, Status
 # 定义命令
 Types_Ticket = {
     "活动的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
-    "未接的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED, Ticket.status != Status.SCHEDULED, Ticket.status!=Status.PROCESSING).order_by(Ticket.begin_at.desc()),
+    "未接的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED, Ticket.status != Status.SCHEDULED, Ticket.status != Status.PROCESSING).order_by(Ticket.begin_at.desc()),
     "预约的": lambda id: select(Ticket).filter(Ticket.status == Status.SCHEDULED).order_by(Ticket.begin_at.desc()),
     "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id,
@@ -65,6 +65,8 @@ force_close_ticket_mathcer = on_command("fclose", rule=is_engineer & to_me(), al
                                         block=True)
 scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预约"}, priority=10,
                                       block=True)
+set_schedule_matcher = on_command(
+    "set_schedule", rule=is_engineer & to_me(),aliases={"设置默认预约"},priority=10, block=True)
 send_ticket_matcher = on_command("send", rule=is_engineer & to_me(), aliases={
                                  "留言"}, priority=10, block=True)
 op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule=to_me() & is_backend,
