@@ -206,7 +206,7 @@ async def take_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: 
     engineer_id = event.get_user_id()
     if not ticket:
         await take_ticket_matcher.finish()
-    if ticket.status not in [Status.PENDING, Status.SCHEDULED]:
+    if ticket.status in [Status.CREATING, Status.CLOSED, Status.PROCESSING]:
         await take_ticket_matcher.finish("该工单尚未创建完成或已被接单")
     ticket.status = Status.PROCESSING
     ticket.engineer_id = engineer_id
@@ -349,9 +349,9 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
 
 # 处理预定
 @scheduled_ticket_matcher.handle()
-async def _(matcher:Matcher):
+async def _(matcher: Matcher):
     await matcher.send("默认时间："+default_schedule)
-    
+
 
 @scheduled_ticket_matcher.got("usedefault", prompt=MessageTemplate("使用默认时间?(是/否)"))
 async def schedule_use_default(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, usedefault: str = ArgPlainText()):
