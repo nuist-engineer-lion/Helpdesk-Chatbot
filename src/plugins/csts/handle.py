@@ -52,6 +52,14 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
                     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=Message(f"{customer_id}在工单{last_ticket.id}结束后说:"))
                     await customer_message.finish(event.message)
 
+        # 获取客户第一次回复的消息内容并判断字数
+        first_reply_text = event.message.extract_plain_text()
+        if len(first_reply_text) <= plugin_config.len_first_reply:
+            to_send_first_reply = plugin_config.first_reply_S
+        else:
+            to_send_first_reply = plugin_config.first_reply_L
+
+
         # 如果没有则直接创建
         # 创建工单
         ticket = Ticket(customer_id=customer_id, begin_at=datetime.fromtimestamp(event.time, cst),
@@ -66,7 +74,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         except:
             logger.warning("不支持set_input_status api")
         await sleep(plugin_config.first_reply_delay)
-        await customer_message.send(plugin_config.first_reply)
+        await customer_message.send(to_send_first_reply)
     elif ticket.status == Status.CREATING:
         # 更新工单的创建过期时间
         ticket.creating_expired_at = datetime.now(
