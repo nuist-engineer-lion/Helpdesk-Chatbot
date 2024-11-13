@@ -56,7 +56,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         first_reply_text = event.message.extract_plain_text()
         if len(first_reply_text) <= plugin_config.len_first_reply:
             to_send_first_reply = plugin_config.first_reply_S
-        elif len(first_reply_text) > plugin_config.len_first_reply:
+        else:
             to_send_first_reply = plugin_config.first_reply_L
 
 
