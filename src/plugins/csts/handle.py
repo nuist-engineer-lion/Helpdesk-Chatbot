@@ -34,6 +34,8 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
         select(Ticket).filter(Ticket.customer_id == customer_id, Ticket.status != Status.CLOSED).order_by(
             Ticket.begin_at.desc()).limit(1))
     ticket = ticket.scalars().first()
+    whether_first = False  # 标记，用于记录是否仅触发一次字数检测
+    
     if ticket is None:  # 如果没有工单
         # 检查是否存在最近刚刚关闭的工单
         logger.info("发生关单后发消息")
@@ -67,6 +69,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
             logger.warning("不支持set_input_status api")
         await sleep(plugin_config.first_reply_delay)
         await customer_message.send(plugin_config.first_reply)
+        whether_first = True  # 标记已发送第一次回复，标记为True
     elif ticket.status == Status.CREATING:
         # 更新工单的创建过期时间
         ticket.creating_expired_at = datetime.now(
@@ -102,6 +105,12 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
     elif ticket.status == Status.SCHEDULED:
         await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"预定过的{ticket.id} {ticket.customer_id}说:")
         await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=event.message)
+    if whether_first and isinstance(event, PrivateMessageEvent): # 处理客户在第一次询问后的回复
+        further_reply_text = event.message.extract_plain_text()
+        if len(further_reply_text) <= len_of_reply:
+            await customer_message.send(plugin_config.further_short)
+        else:
+            await customer_message.send(plugin_config.further_long)
 
 
 # 捕获未能解析的工程师命令
