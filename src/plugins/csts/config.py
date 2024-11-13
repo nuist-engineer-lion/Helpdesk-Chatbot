@@ -19,7 +19,9 @@ class Config(BaseModel):
     new_ticket_notify: str = "有新工单，请尽快处理！"  # 新工单通知消息
     alarm_ticket_notify: str = "用户在催单啦！请尽快处理！"  # 工单报警通知消息
 
-    first_reply: str = "您好，欢迎联系咨询，请描述您的问题。"  # 第一次回复消息
+    len_first_reply: int=  5   #判断字数
+    first_reply_S: str ="您的描述有点简略哦，可以详细说一说具体情况"  # 第一次回复消息S
+    first_reply_L: str ="好的，已了解您的大致情况，请稍等。"  # 第一次回复消息L
     first_reply_delay: int = 5  # 秒，第一次回复延迟时间
     # second_reply: str = "我们已经收到您的问题，正在为您联系工程师，请稍等片刻。"# 第二次回复消息
     # third_reply: str = "正在为您加急联系中，请稍等片刻。"# 第三次回复消息
