@@ -50,8 +50,8 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
                     seconds=plugin_config.ticket_create_interval
                 ):
                     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=Message(f"{customer_id}在工单{last_ticket.id}结束后说:"))
-                    await customer_message.finish(event.message)
-
+                    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=event.message)
+        
         # 获取客户第一次回复的消息内容并判断字数
         first_reply_text = event.message.extract_plain_text()
         if len(first_reply_text) <= plugin_config.len_first_reply:
