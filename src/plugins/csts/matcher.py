@@ -66,9 +66,11 @@ force_close_ticket_mathcer = on_command("fclose", rule=is_engineer & to_me(), al
 scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预约"}, priority=10,
                                       block=True)
 set_schedule_matcher = on_command(
-    "set_schedule", rule=is_engineer & to_me(),aliases={"设置默认预约"},priority=10, block=True)
+    "set_schedule", rule=is_engineer & to_me(), aliases={"设置默认预约"}, priority=10, block=True)
 send_ticket_matcher = on_command("send", rule=is_engineer & to_me(), aliases={
                                  "留言"}, priority=10, block=True)
+report_matcher = on_command(
+    "report", aliases={"报告", "统计"}, rule=is_engineer & to_me(), priority=10, block=True)
 op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule=to_me() & is_backend,
                                        permission=SUPERUSER, priority=10, block=True)
 who_asked_matcher = on_keyword(

@@ -52,14 +52,13 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
                     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=Message(f"{customer_id}在工单{last_ticket.id}结束后说:"))
                     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=event.message)
                     await customer_message.finish()
-        
+
         # 获取客户第一次回复的消息内容并判断字数
         first_reply_text = event.message.extract_plain_text()
         if len(first_reply_text) <= plugin_config.len_first_reply:
             to_send_first_reply = plugin_config.first_reply_S
         else:
             to_send_first_reply = plugin_config.first_reply_L
-
 
         # 如果没有则直接创建
         # 创建工单
@@ -122,12 +121,12 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
 @help_matcher.handle()
 async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-        """指令列表：(中文英文都可操作)
+"""指令列表：(中文英文都可操作)
 list(列出)|get(获取)|qq(搜索)
 take(接单)|untake(放单)
 close(关单)|qclose(qq关单)|fclose(强制关单)
 scheduled(预约)|set_schedule(设置默认预约)
-send(留言)
+send(留言)|report(报告)(统计)
 """
     )
 
@@ -184,6 +183,7 @@ async def limit_mathcer_backend_bot(event: Event):
 @help_matcher.permission_updater
 @search_qq_matcher.permission_updater
 @set_schedule_matcher.permission_updater
+@report_matcher.permission_updater
 # 群内确认响应者是后端
 async def _(event: Event, matcher: Matcher) -> Permission:
     return Permission(User.from_event(event=event, perm=Permission(limit_mathcer_backend_bot)))
@@ -524,3 +524,35 @@ friend_request = on_notice(_friend_request, priority=1, block=True)
 @friend_request.handle()
 async def _(bot: Bot, event: FriendRequestEvent):
     await event.approve(bot)
+
+# 数据报告
+@report_matcher.handle()
+async def _(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+    try:
+        days = int(args.extract_plain_text())
+    except:
+        days=7
+        await matcher.send(f'没指定天数，默认{days}天')
+    await matcher.send(f"以下是{days}天内的关单统计")
+    tickets = (await session.execute(select(Ticket).filter(Ticket.end_at > datetime.now() - timedelta(days=days)))).scalars()
+    counter:dict[str,int]={}
+    not_correctly_closed = 0
+    msg = '统计结果\n'
+    
+    for ticket in tickets:
+        if ticket.engineer_id:
+            counter.setdefault(ticket.engineer_id,0)
+            counter[ticket.engineer_id]+=1
+        else:
+            not_correctly_closed += 1
+    
+    # 倒序输出关单数
+    for k,v in sorted(counter.items(), key = lambda kv:(kv[1], kv[0]),reverse=True):
+        try:
+            user = await bot.call_api('get_group_member_info',group_id=plugin_config.notify_group,user_id=k,no_cache=False)
+            msg += f'{user['nickname']}:{v}\n'
+        except:
+            msg += f'{k}:{v}\n'
+    msg += f'NaN:{not_correctly_closed}'
+
+    await matcher.finish(msg)
