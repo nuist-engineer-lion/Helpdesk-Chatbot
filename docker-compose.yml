@@ -1,5 +1,6 @@
 services:
     napcat_front:
+        mac_address: 
         environment:
             - ACCOUNT=
             - WSR_ENABLE=true
@@ -15,6 +16,7 @@ services:
         hostname: napcat_front
         image: mlikiowa/napcat-docker:latest
     napcat_backend:
+        mac_address: 
         environment:
             - ACCOUNT=
             - WSR_ENABLE=true
