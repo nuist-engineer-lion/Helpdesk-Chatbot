@@ -546,11 +546,13 @@ async def _(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scop
         else:
             not_correctly_closed += 1
     
+    qid_nick:dict[str,str]={}
+    
     # 倒序输出关单数
     for k,v in sorted(counter.items(), key = lambda kv:(kv[1], kv[0]),reverse=True):
         try:
-            user = await bot.call_api('get_group_member_info',group_id=plugin_config.notify_group,user_id=k,no_cache=False)
-            msg += f'{user['nickname']}:{v}\n'
+            nick = qid_nick.setdefault(k,(await bot.call_api('get_group_member_info',group_id=plugin_config.notify_group,user_id=k,no_cache=False))['nickname'])
+            msg += f'{nick}:{v}\n'
         except:
             msg += f'{k}:{v}\n'
     msg += f'NaN:{not_correctly_closed}'
