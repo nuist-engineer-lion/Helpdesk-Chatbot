@@ -530,11 +530,19 @@ async def _(bot: Bot, event: FriendRequestEvent):
 async def _(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
     try:
         days = int(args.extract_plain_text())
+        if days<0:
+            raise(ValueError)
     except:
         days=7
         await matcher.send(f'没指定天数，默认{days}天')
+    
+    # 防止有铸币要乱搞
+    try:
+        tickets = (await session.execute(select(Ticket).filter(Ticket.end_at > datetime.now() - timedelta(days=days)))).scalars()
+    except:
+        await matcher.finish('不知道发生了什么，但是搜不了')
+        
     await matcher.send(f"以下是{days}天内的关单统计")
-    tickets = (await session.execute(select(Ticket).filter(Ticket.end_at > datetime.now() - timedelta(days=days)))).scalars()
     counter:dict[str,int]={}
     not_correctly_closed = 0
     msg = '统计结果\n'
