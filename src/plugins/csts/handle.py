@@ -400,8 +400,12 @@ async def send_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: 
 # 按qq号搜索处理
 @search_qq_matcher.got("qid", "qq号？")
 async def search_qq(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, qid: str = ArgPlainText()):
-    ticket = await qq_get_db_ticket(qid, matcher, session)
-    await matcher.finish(await print_ticket(ticket))
+    tickets = (await session.execute(select(Ticket).where(Ticket.customer_id == qid).order_by(Ticket.begin_at.desc()).limit(10))).scalars()
+    msgs:list[Message] = []
+    for ticket in tickets:
+        msgs.append(await print_ticket(ticket))
+    await send_combined_msg(get_backend_bot(bot),msgs=msgs,event=event)
+    await matcher.finish()
 
 
 @op_engineer_matcher.handle()
