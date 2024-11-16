@@ -19,7 +19,7 @@ from .model import Engineer, Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
 
-default_schedule = "周六下午"
+default_schedule = "周六下午两点 中老一圆桌"
 
 # 回复客户消息
 
