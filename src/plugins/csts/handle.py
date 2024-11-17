@@ -19,8 +19,6 @@ from .model import Engineer, Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
 
-default_schedule = "周六下午两点 中老一圆桌"
-
 # 回复客户消息
 
 
@@ -359,13 +357,13 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
 # 处理预定
 @scheduled_ticket_matcher.handle()
 async def _(matcher: Matcher):
-    await matcher.send("默认时间："+default_schedule)
+    await matcher.send("默认时间："+ plugin_config.default_schedule)
 
 
 @scheduled_ticket_matcher.got("usedefault", prompt=MessageTemplate("使用默认时间?(是/否)"))
 async def schedule_use_default(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, usedefault: str = ArgPlainText()):
     if usedefault == "是":
-        matcher.set_arg("scheduled_time", Message(default_schedule))
+        matcher.set_arg("scheduled_time", Message(plugin_config.default_schedule))
 
 
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
@@ -483,8 +481,7 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
 @set_schedule_matcher.handle()
 @set_schedule_matcher.got("time", "输入时间地点")
 async def set_schedule(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, time: str = ArgPlainText()):
-    global default_schedule
-    default_schedule = time
+    plugin_config.default_schedule = time
     await matcher.finish("设置完成")
 
 
