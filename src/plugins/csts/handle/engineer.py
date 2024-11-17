@@ -170,24 +170,7 @@ async def qclose_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
         ticket = await qq_get_db_ticket(qid, matcher, session)
     else:
         await matcher.finish("怎么会这样？")
-    engineer_id = event.get_user_id()
-    ticket.description = describe
-    ticket.status = Status.CLOSED
-    ticket.end_at = datetime.fromtimestamp(event.time, cst)
-
-    await session.commit()
-    await session.refresh(ticket)
-
-    # 这玩意太吵了
-    # await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
-    #                                           message=await print_ticket(ticket))
-    # 通知客户
-    await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id),
-                                              message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
-    # 通知接单群
-    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
-                                              message=f"工程师{engineer_id}已处理完{id}！")
-    await matcher.finish()
+    await close_ticket_by_id(bot,matcher,event,session,describe,ticket)
 
 
 @close_ticket_matcher.got("describe", prompt="请描述工单")
@@ -197,6 +180,9 @@ async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session:
         ticket = await get_db_ticket(id, matcher, session)
     else:
         await matcher.finish("怎么会这样？")
+    await close_ticket_by_id(bot,matcher,event,session,describe,ticket)
+
+async def close_ticket_by_id(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, describe: str, ticket:Ticket):
     engineer_id = event.get_user_id()
     ticket.description = describe
     ticket.status = Status.CLOSED
@@ -213,9 +199,8 @@ async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session:
                                               message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
     # 通知接单群
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
-                                              message=f"工程师{engineer_id}已处理完{id}！")
+                                              message=f"工程师{engineer_id}已处理完{ticket.id}！")
     await matcher.finish()
-
 
 # 强制关单
 @force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")
