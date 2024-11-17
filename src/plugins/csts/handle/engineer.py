@@ -1,113 +1,22 @@
 from argparse import Namespace
 from typing import Annotated
-from .matcher import *
+from ..matcher import *
 from datetime import datetime, timedelta, UTC
 from nonebot.typing import T_State
 from nonebot_plugin_orm import async_scoped_session
 from nonebot.params import CommandArg, ShellCommandArgs, ArgPlainText
 from nonebot.exception import ParserExit
 from nonebot import logger, on_notice
-from asyncio import sleep
-from .config import plugin_config
+from ..config import plugin_config
 from pytz import timezone
-from .utils import send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, send_forward_message, print_ticket_history
+from ..utils import get_db_ticket, qq_get_db_ticket, send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, send_forward_message, print_ticket_history, validate_ticket_id
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
 from nonebot.adapters import MessageTemplate
 from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, PrivateMessageEvent, GroupMessageEvent, Message, MessageSegment, FriendRequestEvent
-from .model import Engineer, Ticket
+from ..model import Engineer, Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
-
-# 回复客户消息
-
-
-@customer_message.handle()
-async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: async_scoped_session):
-    if event.message.extract_plain_text() in "请求添加你为好友":
-        await customer_message.finish()
-    customer_id = event.get_user_id()
-    # 根据客户id获取最新的未关闭工单
-    ticket = await session.execute(
-        select(Ticket).filter(Ticket.customer_id == customer_id, Ticket.status != Status.CLOSED).order_by(
-            Ticket.begin_at.desc()).limit(1))
-    ticket = ticket.scalars().first()
-    if ticket is None:  # 如果没有工单
-        # 检查是否存在最近刚刚关闭的工单
-        logger.info("发生关单后发消息")
-        last_ticket = (await session.execute(
-            select(Ticket).filter(Ticket.customer_id == customer_id, Ticket.status == Status.CLOSED).order_by(
-                Ticket.begin_at.desc()).limit(1)
-        )).scalars().first()
-
-        # 如果有上一次的工单则进行判断
-        if last_ticket:
-            if last_ticket.end_at:
-                # 如果小于预定时间
-                if last_ticket.end_at > datetime.now() - timedelta(
-                    seconds=plugin_config.ticket_create_interval
-                ):
-                    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=Message(f"{customer_id}在工单{last_ticket.id}结束后说:"))
-                    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=event.message)
-                    await customer_message.finish()
-
-        # 获取客户第一次回复的消息内容并判断字数
-        first_reply_text = event.message.extract_plain_text()
-        if len(first_reply_text) <= plugin_config.len_first_reply:
-            to_send_first_reply = plugin_config.first_reply_S
-        else:
-            to_send_first_reply = plugin_config.first_reply_L
-
-        # 如果没有则直接创建
-        # 创建工单
-        ticket = Ticket(customer_id=customer_id, begin_at=datetime.fromtimestamp(event.time, cst),
-                        creating_expired_at=datetime.now() + timedelta(
-                            seconds=plugin_config.ticket_creating_alive_time))
-        session.add(ticket)
-        await session.commit()
-        logger.info("创建工单已经提交到数据库")
-        # 延时n秒，用于模拟工程师接单
-        try:
-            await get_front_bot(bot).call_api("set_input_status", user_id=customer_id)
-        except:
-            logger.warning("不支持set_input_status api")
-        await sleep(plugin_config.first_reply_delay)
-        await customer_message.send(to_send_first_reply)
-    elif ticket.status == Status.CREATING:
-        # 更新工单的创建过期时间
-        ticket.creating_expired_at = datetime.now(
-        ) + timedelta(seconds=plugin_config.ticket_creating_alive_time)
-        await session.commit()
-    elif ticket.status == Status.ALARMING:
-        # 更新工单的报警过期时间
-        ticket.alarming_expired_at = datetime.now(
-        ) + timedelta(seconds=plugin_config.ticket_alarming_alive_time)
-        await session.commit()
-    elif ticket.status == Status.PENDING:  # 如果没有工程师接单，设置为催单状态
-        ticket.status = Status.ALARMING
-        ticket.alarming_expired_at = datetime.now(
-        ) + timedelta(seconds=plugin_config.ticket_alarming_alive_time)
-        await session.commit()
-        logger.info("发生催单")
-        try:
-            await bot.call_api("set_input_status", user_id=customer_id)
-        except:
-            logger.warning("不支持set_input_status api")
-    elif ticket.status == Status.PROCESSING:
-        # 转发消息给工程师
-        # is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
-        await send_combined_msg(
-            get_backend_bot(bot),
-            [
-                Message("接收到来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),
-                Message(f"[CQ:contact,type=qq,id={customer_id}]"),
-                event.message
-            ],
-            target_user_id=ticket.engineer_id
-        )
-    elif ticket.status == Status.SCHEDULED:
-        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"预定过的{ticket.id} {ticket.customer_id}说:")
-        await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=event.message)
 
 
 # 捕获未能解析的工程师命令
@@ -119,7 +28,7 @@ async def reply_engineer_message(bot: Bot, event: MessageEvent, session: async_s
 @help_matcher.handle()
 async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_session):
     await engineer_message.finish(
-"""指令列表：(中文英文都可操作)
+        """指令列表：(中文英文都可操作)
 list(列出)|get(获取)|qq(搜索)
 take(接单)|untake(放单)
 close(关单)|qclose(qq关单)|fclose(强制关单)
@@ -146,7 +55,7 @@ async def _(matcher: Matcher, session: async_scoped_session, args: Message = Com
         else:
             await matcher.finish("工单不存在")
 
-# 所有指定qq号的函数共同处理
+# 所有指定qq号来获取工单的函数共同处理
 
 
 @qid_close_ticket_matcher.handle()
@@ -158,33 +67,6 @@ async def _(matcher: Matcher, session: async_scoped_session, args: Message = Com
             matcher.set_arg("qid", args)
         else:
             await matcher.finish("工单不存在")
-
-
-async def limit_mathcer_backend_bot(event: Event):
-    if plugin_config.backend_bot:
-        if event.self_id == int(plugin_config.backend_bot):
-            return True
-        else:
-            return False
-    else:
-        return True
-
-
-@close_ticket_matcher.permission_updater
-@force_close_ticket_mathcer.permission_updater
-@untake_ticket_matcher.permission_updater
-@get_ticket_matcher.permission_updater
-@take_ticket_matcher.permission_updater
-@scheduled_ticket_matcher.permission_updater
-@send_ticket_matcher.permission_updater
-@qid_close_ticket_matcher.permission_updater
-@help_matcher.permission_updater
-@search_qq_matcher.permission_updater
-@set_schedule_matcher.permission_updater
-@report_matcher.permission_updater
-# 群内确认响应者是后端
-async def _(event: Event, matcher: Matcher) -> Permission:
-    return Permission(User.from_event(event=event, perm=Permission(limit_mathcer_backend_bot)))
 
 
 @scheduled_ticket_matcher.got("id", prompt="单号？")
@@ -357,13 +239,14 @@ async def force_close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, se
 # 处理预定
 @scheduled_ticket_matcher.handle()
 async def _(matcher: Matcher):
-    await matcher.send("默认时间："+ plugin_config.default_schedule)
+    await matcher.send("默认时间：" + plugin_config.default_schedule)
 
 
 @scheduled_ticket_matcher.got("usedefault", prompt=MessageTemplate("使用默认时间?(是/否)"))
 async def schedule_use_default(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, usedefault: str = ArgPlainText()):
     if usedefault == "是":
-        matcher.set_arg("scheduled_time", Message(plugin_config.default_schedule))
+        matcher.set_arg("scheduled_time", Message(
+            plugin_config.default_schedule))
 
 
 @scheduled_ticket_matcher.got("scheduled_time", prompt="预约时间地点？（会直接转发给机主）")
@@ -399,52 +282,14 @@ async def send_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: 
 @search_qq_matcher.got("qid", "qq号？")
 async def search_qq(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, qid: str = ArgPlainText()):
     tickets = (await session.execute(select(Ticket).where(Ticket.customer_id == qid).order_by(Ticket.begin_at.desc()).limit(10))).scalars()
-    msgs:list[Message] = []
+    msgs: list[Message] = []
     for ticket in tickets:
         msgs.append(await print_ticket(ticket))
-    await send_combined_msg(get_backend_bot(bot),msgs=msgs,event=event)
+    await send_combined_msg(get_backend_bot(bot), msgs=msgs, event=event)
     await matcher.finish()
 
 
-@op_engineer_matcher.handle()
-async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,
-            args: Annotated[ParserExit, ShellCommandArgs()]):
-    await op_engineer_matcher.finish(engineer_parser.format_help())
 
-
-@op_engineer_matcher.handle()
-async def _(bot: Bot, event: MessageEvent, session: async_scoped_session,
-            args: Annotated[Namespace, ShellCommandArgs()]):
-    if args.sub == "add":
-        if args.a:
-            users = await bot.get_group_member_list(group_id=int(plugin_config.notify_group))
-            for user in users:
-                if str(user['user_id']) not in [str(plugin_config.backend_bot), str(plugin_config.front_bot)]:
-                    engineer = Engineer(engineer_id=str(user['user_id']))
-                    session.add(engineer)
-        else:
-            if not args.ids:
-                await op_engineer_matcher.finish(engineer_parser_add.format_help())
-            for id in args.ids:
-                engineer = Engineer(engineer_id=id)
-                session.add(engineer)
-        await session.commit()
-    elif args.sub == "del":
-        if not args.ids:
-            await op_engineer_matcher.finish(engineer_parser_del.format_help())
-        for id in args.ids:
-            engineer = (await session.execute(select(Engineer).where(Engineer.engineer_id == id))).scalar_one_or_none()
-            if engineer:
-                await session.delete(engineer)
-        await session.commit()
-    elif args.sub == "list":
-        engineers = (await session.execute(select(Engineer))).scalars().all()
-        msg = []
-        for engineer in engineers:
-            msg += Message(engineer.engineer_id)
-        await send_combined_msg(get_backend_bot(bot), msgs=msg, event=event)
-    else:
-        await op_engineer_matcher.finish(engineer_parser.format_usage())
 
 
 # list 错误处理
@@ -485,82 +330,48 @@ async def set_schedule(bot: Bot, matcher: Matcher, event: MessageEvent, session:
     await matcher.finish("设置完成")
 
 
-async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "请输入正确的工单号") -> int:
-    arg = args.strip()
-    try:
-        ticket_id = int(arg)
-    except:
-        await matcher.finish(error_message)
-    return ticket_id
-
-
-async def get_db_ticket(id: str, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
-    ticket = await session.get(Ticket, id)
-    if not ticket:
-        await matcher.finish(error_message)
-    else:
-        return ticket
-
-
-async def qq_get_db_ticket(qid: str, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
-    ticket = (await session.execute(select(Ticket).where(Ticket.customer_id == qid).order_by(Ticket.begin_at.desc()).limit(1))).scalar_one_or_none()
-    if not ticket:
-        await matcher.finish(error_message)
-    else:
-        return ticket
-
-
 @who_asked_matcher.handle()
 # 谁问你了
 async def who_asked(bot: Bot, event: MessageEvent):
     await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}] 谁问你了"))
 
-
-# 处理好友添加请求
-async def _friend_request(bot: Bot, event: Event, state: T_State) -> bool:
-    return isinstance(event, FriendRequestEvent)
-friend_request = on_notice(_friend_request, priority=1, block=True)
-
-
-@friend_request.handle()
-async def _(bot: Bot, event: FriendRequestEvent):
-    await event.approve(bot)
-
 # 数据报告
+
+
 @report_matcher.handle()
 async def _(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
     try:
         days = int(args.extract_plain_text())
-        if days<0:
-            raise(ValueError)
+        if days < 0:
+            raise (ValueError)
     except:
-        days=7
+        days = 7
         await matcher.send(f'没指定天数，默认{days}天')
-    
+
     # 防止有铸币要乱搞
     try:
         tickets = (await session.execute(select(Ticket).filter(Ticket.end_at > datetime.now() - timedelta(days=days)))).scalars()
     except:
         await matcher.finish('不知道发生了什么，但是搜不了')
-        
+
     await matcher.send(f"以下是{days}天内的关单统计")
-    counter:dict[str,int]={}
+    counter: dict[str, int] = {}
     not_correctly_closed = 0
     msg = '统计结果\n'
-    
+
     for ticket in tickets:
         if ticket.engineer_id:
-            counter.setdefault(ticket.engineer_id,0)
-            counter[ticket.engineer_id]+=1
+            counter.setdefault(ticket.engineer_id, 0)
+            counter[ticket.engineer_id] += 1
         else:
             not_correctly_closed += 1
-    
-    qid_nick:dict[str,str]={}
-    
+
+    qid_nick: dict[str, str] = {}
+
     # 倒序输出关单数
-    for k,v in sorted(counter.items(), key = lambda kv:(kv[1], kv[0]),reverse=True):
+    for k, v in sorted(counter.items(), key=lambda kv: (kv[1], kv[0]), reverse=True):
         try:
-            nick = qid_nick.setdefault(k,(await bot.call_api('get_group_member_info',group_id=plugin_config.notify_group,user_id=k,no_cache=False))['nickname'])
+            nick = qid_nick.setdefault(k, (await bot.call_api('get_group_member_info', group_id=plugin_config.notify_group, user_id=k, no_cache=False))['nickname'])
             msg += f'{nick}:{v}\n'
         except:
             msg += f'{k}:{v}\n'

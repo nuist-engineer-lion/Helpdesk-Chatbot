@@ -1,14 +1,17 @@
 from pytz import timezone
 from datetime import datetime
-from nonebot_plugin_orm import get_session
+from nonebot_plugin_orm import async_scoped_session, get_session
 from nonebot_plugin_chatrecorder import get_message_records
 from typing import Optional
+from nonebot.matcher import Matcher
 from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent, Message, GroupMessageEvent
 from nonebot.internal.adapter.bot import Bot
 from nonebot_plugin_chatrecorder import MessageRecord
+from sqlalchemy import select
+from nonebot import get_bot, require
 from .config import plugin_config
 from .model import Ticket
-from nonebot import get_bot, require
+
 
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
@@ -54,6 +57,7 @@ async def send_combined_msg(
                 "send_group_forward_msg", group_id=event.group_id, messages=messages
             )
 
+
 async def send_forward_message(
         bot: Bot,
         msgs: list[MessageRecord],
@@ -62,17 +66,17 @@ async def send_forward_message(
         target_user_id: Optional[str | int] = None,
         block_event: bool = False,):
     def to_node(msg: MessageRecord):
-        print(msg.message_id,msg.message)
+        print(msg.message_id, msg.message)
         return {"type": "node", "data": {"id": msg.message_id}}
     message_nodes = [to_node(msg) for msg in msgs]
     if target_group_id:
         await bot.call_api(
-        "send_forward_msg", group_id=target_group_id,messages=message_nodes
-    )
+            "send_forward_msg", group_id=target_group_id, messages=message_nodes
+        )
     if target_user_id:
         await bot.call_api(
-        "send_forward_msg", user_id=target_user_id,messages=message_nodes
-    )
+            "send_forward_msg", user_id=target_user_id, messages=message_nodes
+        )
     if not block_event and event:
         if isinstance(event, PrivateMessageEvent):
             await bot.call_api(
@@ -101,7 +105,8 @@ async def print_ticket(ticket: Ticket) -> Message:
         msg = msg+f'描述:{ticket.description}'
     return Message(msg)
 
-async def print_ticket_history(ticket:Ticket) -> list[MessageRecord]:
+
+async def print_ticket_history(ticket: Ticket) -> list[MessageRecord]:
     if not ticket:
         raise (ValueError)
     # 下面打印历史消息
@@ -113,6 +118,7 @@ async def print_ticket_history(ticket:Ticket) -> list[MessageRecord]:
         ticket.end_at)
     message_records = await get_message_records(id1s=[ticket.customer_id], time_start=cst.localize(ticket.begin_at), time_stop=ticket_end_at, id2s=[''], bot_ids=bot_id)
     return message_records
+
 
 async def print_ticket_info(ticket: Ticket) -> list[Message]:
     msgs = []
@@ -177,3 +183,28 @@ def get_front_bot(bot):
         return get_bot(str(plugin_config.front_bot))
     else:
         return bot
+
+
+async def validate_ticket_id(args: str, matcher: Matcher, error_message: str = "请输入正确的工单号") -> int:
+    arg = args.strip()
+    try:
+        ticket_id = int(arg)
+    except:
+        await matcher.finish(error_message)
+    return ticket_id
+
+
+async def get_db_ticket(id: str, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
+    ticket = await session.get(Ticket, id)
+    if not ticket:
+        await matcher.finish(error_message)
+    else:
+        return ticket
+
+
+async def qq_get_db_ticket(qid: str, matcher: Matcher, session: async_scoped_session, error_message: str = "工单不存在"):
+    ticket = (await session.execute(select(Ticket).where(Ticket.customer_id == qid).order_by(Ticket.begin_at.desc()).limit(1))).scalar_one_or_none()
+    if not ticket:
+        await matcher.finish(error_message)
+    else:
+        return ticket
