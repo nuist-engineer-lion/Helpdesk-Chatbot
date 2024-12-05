@@ -14,12 +14,12 @@ Types_Ticket = {
     "活动的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "未接的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED, Ticket.status != Status.SCHEDULED, Ticket.status != Status.PROCESSING).order_by(Ticket.begin_at.desc()),
     "预约的": lambda id: select(Ticket).filter(Ticket.status == Status.SCHEDULED).order_by(Ticket.begin_at.desc()),
-    "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
+    # "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id,
                                                     Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
-    "所有的": lambda id: select(Ticket).order_by(Ticket.begin_at.desc()),
-    "所有我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(
-        Ticket.begin_at.desc())
+    # "所有的": lambda id: select(Ticket).order_by(Ticket.begin_at.desc()),
+    # "所有我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(
+        # Ticket.begin_at.desc())
 }
 
 list_parser = ArgumentParser(prog="list")
