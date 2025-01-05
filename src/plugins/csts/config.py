@@ -20,8 +20,8 @@ class Config(BaseModel):
     alarm_ticket_notify: str = "用户在催单啦！请尽快处理！"  # 工单报警通知消息
 
     len_first_reply: int=  10   #判断字数
-    first_reply_S: str ="您好，欢迎联系咨询，请描述您的问题。(期末学业繁忙，暂停接单，敬请谅解)"  # 第一次回复消息S
-    first_reply_L: str ="您好，欢迎联系咨询，您可以继续描述问题。(期末学业繁忙，暂停接单，敬请谅解)"  # 第一次回复消息L
+    first_reply_S: str ="您好，欢迎联系咨询，请描述您的问题。"  # 第一次回复消息S
+    first_reply_L: str ="您好，欢迎联系咨询，您可以继续描述问题。"  # 第一次回复消息L
 
     first_reply_delay: int = 5  # 秒，第一次回复延迟时间
     # second_reply: str = "我们已经收到您的问题，正在为您联系工程师，请稍等片刻。"# 第二次回复消息
