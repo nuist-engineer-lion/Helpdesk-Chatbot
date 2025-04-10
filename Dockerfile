@@ -1,4 +1,4 @@
-FROM python:3.12 as requirements_stage
+FROM python:3.12 AS requirements_stage
 
 WORKDIR /wheel
 
