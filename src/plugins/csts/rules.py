@@ -30,10 +30,13 @@ async def is_engineer(event: MessageEvent) -> bool:
     if is_backend(event):
         if isinstance(event, GroupMessageEvent):
             return event.group_id == plugin_config.notify_group
-        session = get_session()
-        async with session.begin():
-            return bool((await session.execute(
-                select(Engineer).filter(Engineer.engineer_id == event.get_user_id()))).scalar_one_or_none())
+        else:
+            # all engineer
+            return True
+#        session = get_session()
+#        async with session.begin():
+#            return bool((await session.execute(
+#                select(Engineer).filter(Engineer.engineer_id == event.get_user_id()))).scalar_one_or_none())
     else:
         return False
 
