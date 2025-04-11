@@ -36,7 +36,7 @@ async def send_combined_msg(
     """
 
     def to_node(msg: Message):
-        return {"type": "node", "data": {"name": "name", "uin": "10010", "content": msg}}
+        return {"type": "node", "data": {"name": "CM", "user_id": plugin_config.front_bot, "content": msg}}
 
     messages = [to_node(msg) for msg in msgs]
     if target_group_id:
