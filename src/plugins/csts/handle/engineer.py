@@ -320,6 +320,11 @@ async def set_schedule(bot: Bot, matcher: Matcher, event: MessageEvent, session:
 async def who_asked(bot: Bot, event: MessageEvent):
     await who_asked_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}] 谁问你了"))
 
+@i_understand_matcher.handle()
+# 我懂
+async def i_understand(bot: Bot, event: MessageEvent):
+    await i_understand_matcher.finish(Message(f"[CQ:at,qq={event.get_user_id()}] 我懂"))
+
 # 数据报告
 
 
