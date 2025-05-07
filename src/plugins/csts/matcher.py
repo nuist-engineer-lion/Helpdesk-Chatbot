@@ -4,7 +4,6 @@ from nonebot.permission import SUPERUSER
 from sqlalchemy import select
 from .rules import (
     is_customer,
-    is_backend,
     is_engineer,
 )
 from .model import Ticket, Status
@@ -27,20 +26,20 @@ list_parser.add_argument("type", help=f"工单种类:{' '.join(
     [key for key in Types_Ticket])}", type=str)
 list_parser.add_argument("-a", help="用消息转发显示机主描述", action='store_true')
 
-engineer_parser = ArgumentParser(prog="engineers", description="工程师名单操作")
-engineer_parser_sub = engineer_parser.add_subparsers(
-    dest="sub", help='subcommand help')
+# engineer_parser = ArgumentParser(prog="engineers", description="工程师名单操作")
+# engineer_parser_sub = engineer_parser.add_subparsers(
+#     dest="sub", help='subcommand help')
 
-engineer_parser_add = engineer_parser_sub.add_parser("add", help="添加工程师")
-engineer_parser_add.add_argument("-a", help="加入通知群聊的所有人", action='store_true')
-engineer_parser_add.add_argument(
-    "--ids", action="extend", nargs="+", type=str, help="列出id")
+# engineer_parser_add = engineer_parser_sub.add_parser("add", help="添加工程师")
+# engineer_parser_add.add_argument("-a", help="加入通知群聊的所有人", action='store_true')
+# engineer_parser_add.add_argument(
+#     "--ids", action="extend", nargs="+", type=str, help="列出id")
 
-engineer_parser_del = engineer_parser_sub.add_parser("del", help="删除工程师")
-engineer_parser_del.add_argument(
-    "ids", action="extend", nargs="+", type=str, help="列出id")
+# engineer_parser_del = engineer_parser_sub.add_parser("del", help="删除工程师")
+# engineer_parser_del.add_argument(
+#     "ids", action="extend", nargs="+", type=str, help="列出id")
 
-engineer_parser_list = engineer_parser_sub.add_parser("list", help="列出全部工程师")
+# engineer_parser_list = engineer_parser_sub.add_parser("list", help="列出全部工程师")
 
 # 定义响应器
 customer_message = on_message(rule=is_customer & to_me(), priority=100)
@@ -71,8 +70,8 @@ send_ticket_matcher = on_command("send", rule=is_engineer & to_me(), aliases={
                                  "留言"}, priority=10, block=True)
 report_matcher = on_command(
     "report", aliases={"报告", "统计"}, rule=is_engineer & to_me(), priority=10, block=True)
-op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule=to_me() & is_backend,
-                                       permission=SUPERUSER, priority=10, block=True)
+# op_engineer_matcher = on_shell_command("engineers", parser=engineer_parser, rule=to_me() & is_backend,
+#                                        permission=SUPERUSER, priority=10, block=True)
 who_asked_matcher = on_keyword(
     {"我恨你", "I hate you"}, rule=is_engineer, priority=11)
 
