@@ -27,6 +27,6 @@ class Config(BaseModel):
     # second_reply: str = "我们已经收到您的问题，正在为您联系工程师，请稍等片刻。"# 第二次回复消息
     # third_reply: str = "正在为您加急联系中，请稍等片刻。"# 第三次回复消息
     
-    default_schedule: str = "周六下午两点 中老一圆桌"
+    default_schedule: str = "西苑新食堂东边融智共享空间 周六下午一点到下午五点"
 
 plugin_config = get_plugin_config(Config)
