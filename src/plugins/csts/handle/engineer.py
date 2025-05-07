@@ -196,7 +196,7 @@ async def close_ticket_by_id(bot: Bot, matcher: Matcher, event: MessageEvent, se
     #                                           message=await print_ticket(ticket))
     # 通知客户
     #await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id),
-                                              message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
+    #                                          message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
     # 通知接单群
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}已处理完{ticket.id}！")
