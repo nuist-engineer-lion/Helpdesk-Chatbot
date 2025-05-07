@@ -13,18 +13,26 @@ Types_Ticket = {
     "活动的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "未接的": lambda id: select(Ticket).filter(Ticket.status != Status.CLOSED, Ticket.status != Status.SCHEDULED, Ticket.status != Status.PROCESSING).order_by(Ticket.begin_at.desc()),
     "预约的": lambda id: select(Ticket).filter(Ticket.status == Status.SCHEDULED).order_by(Ticket.begin_at.desc()),
-    # "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
     "我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id,
                                                     Ticket.status != Status.CLOSED).order_by(Ticket.begin_at.desc()),
-    # "所有的": lambda id: select(Ticket).order_by(Ticket.begin_at.desc()),
-    # "所有我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(
-        # Ticket.begin_at.desc())
+
+}
+Export_Types_Ticket = {
+    **Types_Ticket,
+    "完成的": lambda id: select(Ticket).filter(Ticket.status == Status.CLOSED).order_by(Ticket.begin_at.desc()),
+    "所有的": lambda id: select(Ticket).order_by(Ticket.begin_at.desc()),
+    "所有我的": lambda engineer_id: select(Ticket).filter(Ticket.engineer_id == engineer_id).order_by(Ticket.begin_at.desc())
 }
 
 list_parser = ArgumentParser(prog="list")
 list_parser.add_argument("type", help=f"工单种类:{' '.join(
     [key for key in Types_Ticket])}", type=str)
 list_parser.add_argument("-a", help="用消息转发显示机主描述", action='store_true')
+
+export_parser = ArgumentParser(prog="export")
+export_parser.add_argument("type",help=f"工单种类:{' '.join(
+    [key for key in Export_Types_Ticket])}", type=str)
+export_parser.add_argument("-a", help="包含机主描述", action='store_true')
 
 # engineer_parser = ArgumentParser(prog="engineers", description="工程师名单操作")
 # engineer_parser_sub = engineer_parser.add_subparsers(
