@@ -38,6 +38,7 @@ services:
             HOST: 0.0.0.0
             PORT: 8080
         image: helpdesk-chatbot-nonebot
+        build: ./Dockerfile
         volumes:
           - ./data:/app/data
           - .env.prod:/app/.env.prod
