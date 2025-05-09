@@ -51,7 +51,7 @@ async def gen_message_node_by_ticket(
         ) -> list[dict]:
     message_records=await get_messages_records(ticket)
     messages = []
-    if plaintext:
+    if not plaintext:
         for msg in message_records:
             if msg.type=="message_sent":
                 messages.append(to_node("工程师",self_id, msg.message))
