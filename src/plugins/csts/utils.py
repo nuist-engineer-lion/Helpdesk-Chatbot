@@ -52,9 +52,9 @@ async def gen_message_node_by_ticket(
     messages = []
     for msg in message_records:
         if msg.type=="message_sent":
-            messages.append(to_node("工程师",self_id, msg))
+            messages.append(to_node("工程师",self_id, msg.message))
         else:
-            messages.append(to_node("机主",ticket.customer_id,msg))
+            messages.append(to_node("机主",ticket.customer_id,msg.message))
     return messages
 
 def gen_message_node_by_msgs(
