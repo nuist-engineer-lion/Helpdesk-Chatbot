@@ -300,15 +300,15 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
             msg_nodes = []
             for ticket in tickets:
                 msg_nodes.append(to_node("CM", bot.self_id, print_ticket(ticket)))
-                msg_nodes.append(gen_message_node_by_ticket(
-                    get_front_bot(bot).self_id, ticket))
+                msg_nodes.append(to_node("CM",bot.self_id,await gen_message_node_by_ticket(
+                    get_front_bot(bot).self_id, ticket)))
             await send_forward_msg(bot, msg_nodes, event=event)
         except:
             msg_nodes = []
             for ticket in tickets:
                 msg_nodes.append(to_node("CM", bot.self_id, print_ticket(ticket)))
-                msg_nodes.append(gen_message_node_by_id(
-                    await get_messages_records(ticket)))
+                msg_nodes.append(to_node("CM",bot.self_id,gen_message_node_by_id(
+                    await get_messages_records(ticket))))
             await send_forward_msg(get_front_bot(bot),msg_nodes,event=event)
     else:
         msgs = []
