@@ -31,7 +31,7 @@ async def help_message(bot: Bot, event: MessageEvent, session: async_scoped_sess
         """指令列表：(中文英文都可操作)
 list(列出)|get(获取)|qq(搜索)
 take(接单)|untake(放单)
-close(关单)|qclose(qq关单)|fclose(强制关单)
+close(关单)|qclose(qq关单)|fclose(强制关单)|mclose(批量关单)
 scheduled(预约)|set_schedule(设置默认预约)
 send(留言)|report(报告)(统计)
 """
@@ -56,8 +56,6 @@ async def _(matcher: Matcher, session: async_scoped_session, args: Message = Com
             await matcher.finish("工单不存在")
 
 # 所有指定qq号来获取工单的函数共同处理
-
-
 @qid_close_ticket_matcher.handle()
 @search_qq_matcher.handle()
 async def _(matcher: Matcher, session: async_scoped_session, args: Message = CommandArg()):
@@ -182,6 +180,8 @@ async def close_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session:
         await matcher.finish("怎么会这样？")
     await close_ticket_by_id(bot,matcher,event,session,describe,ticket)
 
+
+
 async def close_ticket_by_id(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, describe: str, ticket:Ticket):
     engineer_id = event.get_user_id()
     ticket.description = describe
@@ -201,6 +201,21 @@ async def close_ticket_by_id(bot: Bot, matcher: Matcher, event: MessageEvent, se
     await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}已处理完{ticket.id}！")
     await matcher.finish()
+
+# 批量关单
+@close_many_ticket_matcher.handle()
+async def _(bot:Bot,matcher:Matcher,event:MessageEvent,session:async_scoped_session,ids:str = ArgPlainText()):
+    ids_list=ids.split(" ")
+    for id in ids_list:
+        ticket = await get_db_ticket(id, matcher, session)
+
+        ticket.status = Status.CLOSED
+        ticket.end_at = datetime.fromtimestamp(event.time, cst)
+        ticket.description = "批量关单"
+        await session.commit()
+    await session.refresh(ticket)
+
+    await close_many_ticket_matcher.finish(f"强制关单{ticket.id}")
 
 # 强制关单
 @force_close_ticket_mathcer.got("describe", prompt="为什么强制关单？")

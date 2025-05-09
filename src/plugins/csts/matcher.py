@@ -1,3 +1,4 @@
+from annotated_types import T
 from nonebot import on_keyword, on_shell_command, on_message, on_command
 from nonebot.rule import to_me, ArgumentParser
 from nonebot.permission import SUPERUSER
@@ -30,7 +31,7 @@ list_parser.add_argument("type", help=f"工单种类:{' '.join(
 list_parser.add_argument("-a", help="用消息转发显示机主描述", action='store_true')
 
 export_parser = ArgumentParser(prog="export")
-export_parser.add_argument("type",help=f"工单种类:{' '.join(
+export_parser.add_argument("type", help=f"工单种类:{' '.join(
     [key for key in Export_Types_Ticket])}", type=str)
 export_parser.add_argument("-a", help="包含机主描述", action='store_true')
 
@@ -70,6 +71,8 @@ qid_close_ticket_matcher = on_command(
     "qclose", rule=is_engineer & to_me(), aliases={"qq关单"}, priority=10, block=True)
 force_close_ticket_mathcer = on_command("fclose", rule=is_engineer & to_me(), aliases={"强制关单"}, priority=10,
                                         block=True)
+close_many_ticket_matcher = on_command(
+    "mclose", aliases={"批量关单"}, priority=10, block=True, rule=is_engineer & to_me())
 scheduled_ticket_matcher = on_command("scheduled", rule=is_engineer & to_me(), aliases={"预约"}, priority=10,
                                       block=True)
 set_schedule_matcher = on_command(

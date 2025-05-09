@@ -10,7 +10,8 @@ from ..matcher import (
     help_matcher,
     search_qq_matcher,
     set_schedule_matcher,
-    report_matcher
+    report_matcher,
+    close_many_ticket_matcher
 )
 from ..config import plugin_config
 
@@ -31,6 +32,7 @@ from nonebot.permission import Permission, User
 @search_qq_matcher.permission_updater
 @set_schedule_matcher.permission_updater
 @report_matcher.permission_updater
+@close_many_ticket_matcher.permission_updater
 # 群内确认响应者是后端
 async def _(event: Event, matcher: Matcher) -> Permission:
     return Permission(User.from_event(event=event, perm=Permission(limit_mathcer_backend_bot)))
