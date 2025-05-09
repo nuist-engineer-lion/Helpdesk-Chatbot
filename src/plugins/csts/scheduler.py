@@ -30,14 +30,10 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
-            await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
-            # try:
-            #     await gen_message_node_by_id(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
-            # except:
-            #     await gen_message_node_by_msgs(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
-
-            # 不要告诉机主转发出去了
-            # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
+            try:
+                await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+            except:
+                await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),target_group_id=plugin_config.notify_group)
         
 
     # 筛选出所有处于alarming但是已经过期的工单
@@ -56,10 +52,7 @@ async def ticket_check():
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
-            await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
-            # try:
-            #     await gen_message_node_by_id(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
-            # except:
-            #     await gen_message_node_by_msgs(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
-            # 不要告诉机主他在催单
-            # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
+            try:
+                await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+            except:
+                 await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),target_group_id=plugin_config.notify_group)

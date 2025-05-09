@@ -8,7 +8,7 @@ from nonebot.params import CommandArg, ShellCommandArgs, ArgPlainText
 from nonebot.exception import ParserExit
 from ..config import plugin_config
 from pytz import timezone
-from ..utils import gen_message_node_by_ticket, get_db_ticket, qq_get_db_ticket, gen_message_node_by_msgs, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, get_messages_records, send_forward_msg, to_node, validate_ticket_id
+from ..utils import gen_message_node_by_id, gen_message_node_by_ticket, get_db_ticket, qq_get_db_ticket, gen_message_node_by_msgs, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, get_messages_records, send_forward_msg, to_node, validate_ticket_id
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
 from nonebot.adapters import MessageTemplate
@@ -80,7 +80,10 @@ async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainT
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await get_db_ticket(id, matcher, session)
     await matcher.send(print_ticket(ticket))
-    await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket), event=event)
+    try:
+        await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket), event=event)
+    except:
+        await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),event=event)
 
 
 # 处理接单
@@ -123,8 +126,10 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
                                               message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
     await matcher.send(print_ticket(ticket))
-    await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket), target_group_id=plugin_config.notify_group)
-
+    try:
+        await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket), target_group_id=plugin_config.notify_group)
+    except:
+        await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),event=event)
     await bot.send_group_msg(group_id=int(plugin_config.notify_group),
                              message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
@@ -291,12 +296,20 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
         await list_ticket_matcher.finish("没有")
 
     if args.a:
-        msg_nodes = []
-        for ticket in tickets:
-            msg_nodes.append(to_node("CM", bot.self_id, print_ticket(ticket)))
-            msg_nodes.append(gen_message_node_by_ticket(
-                get_front_bot(bot).self_id, ticket))
-        await send_forward_msg(bot, msg_nodes, event=event)
+        try:
+            msg_nodes = []
+            for ticket in tickets:
+                msg_nodes.append(to_node("CM", bot.self_id, print_ticket(ticket)))
+                msg_nodes.append(gen_message_node_by_ticket(
+                    get_front_bot(bot).self_id, ticket))
+            await send_forward_msg(bot, msg_nodes, event=event)
+        except:
+            msg_nodes = []
+            for ticket in tickets:
+                msg_nodes.append(to_node("CM", bot.self_id, print_ticket(ticket)))
+                msg_nodes.append(gen_message_node_by_id(
+                    await get_messages_records(ticket)))
+            await send_forward_msg(get_front_bot(bot),msg_nodes,event=event)
     else:
         msgs = []
         for ticket in tickets:
