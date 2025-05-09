@@ -1,3 +1,4 @@
+from email import message
 from pytz import timezone
 from datetime import datetime
 from nonebot_plugin_orm import async_scoped_session, get_session
@@ -16,79 +17,60 @@ from .model import Ticket
 # 获取中国时区
 cst = timezone('Asia/Shanghai')
 
+def to_node(name:str,user_id:int|str,msg: MessageRecord|Message|list[dict]|str):
+    return {"type": "node", "data": {"name": name, "user_id": user_id, "content": msg}}
 
-async def send_combined_msg(
+async def send_forward_msg(
         bot: Bot,
-        msgs: list[Message],
+        messages_nodes:list[dict],
         event: Optional[MessageEvent] = None,
         target_group_id: Optional[str | int] = None,
-        target_user_id: Optional[str | int] = None,
-        block_event: bool = False,
-):
-    """
-    发送合并转发消息。
-    * `bot`: Bot 实例
-    * `event`: 消息事件
-    * `msgs`: 消息列表
-    * `target_group_id`: 目标群号
-    * `target_user_id`: 目标用户号
-    * `block_event`: 是否阻止用event返回消息
-    """
-
-    def to_node(msg: Message):
-        return {"type": "node", "data": {"name": "CM", "user_id": plugin_config.front_bot, "content": msg}}
-
-    messages = [to_node(msg) for msg in msgs]
+        target_user_id: Optional[str | int] = None,block_event: bool = False):
     if target_group_id:
         await bot.call_api(
-            "send_group_forward_msg", group_id=target_group_id, messages=messages
+            "send_group_forward_msg", group_id=target_group_id, messages=messages_nodes
         )
     if target_user_id:
         await bot.call_api(
-            "send_private_forward_msg", user_id=target_user_id, messages=messages
+            "send_private_forward_msg", user_id=target_user_id, messages=messages_nodes
         )
     if not block_event and event:
         if isinstance(event, PrivateMessageEvent):
             await bot.call_api(
-                "send_private_forward_msg", user_id=event.user_id, messages=messages
+                "send_private_forward_msg", user_id=event.user_id, messages=messages_nodes
             )
         elif isinstance(event, GroupMessageEvent):
             await bot.call_api(
-                "send_group_forward_msg", group_id=event.group_id, messages=messages
+                "send_group_forward_msg", group_id=event.group_id, messages=messages_nodes
             )
 
+async def gen_message_node_by_ticket(
+        self_id: int|str,
+        ticket: Ticket,
+        ) -> list[dict]:
+    message_records=await get_messages_records(ticket)
+    messages = []
+    for msg in message_records:
+        if msg.type=="message_sent":
+            messages.append(to_node("工程师",self_id, msg))
+        else:
+            messages.append(to_node("机主",ticket.customer_id,msg))
+    return messages
 
-async def send_forward_message(
-        bot: Bot,
-        msgs: list[MessageRecord],
-        event: Optional[MessageEvent] = None,
-        target_group_id: Optional[str | int] = None,
-        target_user_id: Optional[str | int] = None,
-        block_event: bool = False,):
+def gen_message_node_by_msgs(
+        msgs: list[Message],
+) -> list[dict]:
+    message_nodes = [to_node("CM",str(plugin_config.front_bot),msg) for msg in msgs]
+    return message_nodes
+    
+def gen_message_node_by_id(msgs: list[MessageRecord]) -> list[dict]:
     def to_node(msg: MessageRecord):
-        print(msg.message_id, msg.message)
         return {"type": "node", "data": {"id": msg.message_id}}
     message_nodes = [to_node(msg) for msg in msgs]
-    if target_group_id:
-        await bot.call_api(
-            "send_forward_msg", group_id=target_group_id, messages=message_nodes
-        )
-    if target_user_id:
-        await bot.call_api(
-            "send_forward_msg", user_id=target_user_id, messages=message_nodes
-        )
-    if not block_event and event:
-        if isinstance(event, PrivateMessageEvent):
-            await bot.call_api(
-                "send_forward_msg", user_id=event.user_id, messages=message_nodes
-            )
-        elif isinstance(event, GroupMessageEvent):
-            await bot.call_api(
-                "send_forward_msg", group_id=event.group_id, messages=message_nodes
-            )
+    return message_nodes
 
 
-async def print_ticket(ticket: Ticket) -> Message:
+def print_ticket(ticket: Ticket) -> Message:
     if not ticket:
         # no ticket record
         raise (ValueError)
@@ -106,7 +88,7 @@ async def print_ticket(ticket: Ticket) -> Message:
     return Message(msg)
 
 
-async def print_ticket_history(ticket: Ticket) -> list[MessageRecord]:
+async def get_messages_records(ticket: Ticket) -> list[MessageRecord]:
     if not ticket:
         raise (ValueError)
     # 下面打印历史消息

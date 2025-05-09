@@ -9,7 +9,7 @@ from nonebot.exception import ParserExit
 from nonebot import logger, on_notice
 from ..config import plugin_config
 from pytz import timezone
-from ..utils import get_db_ticket, qq_get_db_ticket, send_combined_msg, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, send_forward_message, print_ticket_history, validate_ticket_id
+from ..utils import gen_message_node_by_ticket, get_db_ticket, qq_get_db_ticket, gen_message_node_by_msgs, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, gen_message_node_by_id, get_messages_records, send_forward_msg, to_node, validate_ticket_id
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
 from nonebot.adapters import MessageTemplate
@@ -79,11 +79,8 @@ async def _(matcher: Matcher, session: async_scoped_session, id: str = ArgPlainT
 @get_ticket_matcher.got("id", prompt="单号？")
 async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, id: str = ArgPlainText()):
     ticket = await get_db_ticket(id, matcher, session)
-    await matcher.send(await print_ticket(ticket))
-    try:
-        await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), event=event)
-    except:
-        await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), event=event)
+    await matcher.send(print_ticket(ticket))
+    await send_forward_msg(bot,await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),event=event)
 
 
 # 处理接单
@@ -125,13 +122,13 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
     await get_front_bot(bot).send_private_msg(user_id=customer_id,
                                               message=f"工程师{engineer_id}有事暂时无法处理您的工单，您的工单已重新进入待接单状态！我们将优先为您安排其他工程师！")
     # 通知接单群
-    await matcher.send(await print_ticket(ticket))
-    try:
-        await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
-                                   target_group_id=plugin_config.notify_group)
-    except:
-        await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), target_group_id=plugin_config.notify_group)
-    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
+    await matcher.send(print_ticket(ticket))
+    await send_forward_msg(bot,await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+    # try:
+    #     await send_forward_ticket_history_message(get_backend_bot(bot),ticket,target_group_id=plugin_config.notify_group)
+    # except:
+    #     await gen_message_node_by_msgs(get_backend_bot(bot), await print_ticket_info(ticket), target_group_id=plugin_config.notify_group)
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
 
@@ -198,7 +195,7 @@ async def close_ticket_by_id(bot: Bot, matcher: Matcher, event: MessageEvent, se
     #await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id),
     #                                          message=f"工程师{engineer_id}已处理完您的工单，感谢您的信任和支持！")
     # 通知接单群
-    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group),
                                               message=f"工程师{engineer_id}已处理完{ticket.id}！")
     await matcher.finish()
 
@@ -262,7 +259,7 @@ async def scheduled_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, sess
     await session.refresh(ticket)
     # 发给顾客
     await get_front_bot(bot).send_private_msg(user_id=int(ticket.customer_id), message=f"为您预约：{scheduled_time}")
-    await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约:{id}")
+    await bot.send_group_msg(group_id=int(plugin_config.notify_group), message=f"添加预约:{id}")
 
     await scheduled_ticket_matcher.finish()
 
@@ -284,8 +281,8 @@ async def search_qq(bot: Bot, matcher: Matcher, event: MessageEvent, session: as
     tickets = (await session.execute(select(Ticket).where(Ticket.customer_id == qid).order_by(Ticket.begin_at.desc()).limit(10))).scalars()
     msgs: list[Message] = []
     for ticket in tickets:
-        msgs.append(await print_ticket(ticket))
-    await send_combined_msg(get_backend_bot(bot), msgs=msgs, event=event)
+        msgs.append(print_ticket(ticket))
+    await send_forward_msg(bot,gen_message_node_by_msgs(msgs),event=event)
     await matcher.finish()
 
 
@@ -308,20 +305,18 @@ async def list_ticket(bot: Bot, event: MessageEvent, session: async_scoped_sessi
     tickets = (await session.execute(Types_Ticket[args.type](event.get_user_id()))).scalars().all()
     if not tickets:
         await list_ticket_matcher.finish("没有")
+    
     if args.a:
+        msg_nodes=[]
         for ticket in tickets:
-            await list_ticket_matcher.send(await print_ticket(ticket))
-            try:
-                await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket),
-                                           target_group_id=plugin_config.notify_group)
-            except:
-                await send_combined_msg(get_backend_bot(bot), await print_ticket_info(ticket), target_group_id=plugin_config.notify_group)
+            msg_nodes.append(to_node("CM",bot.self_id,print_ticket(ticket)))
+            msg_nodes.append(gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket))
+        await send_forward_msg(bot,msg_nodes,event=event)
     else:
         msgs = []
         for ticket in tickets:
-            msgs.append(await print_ticket(ticket))
-        await send_combined_msg(get_backend_bot(bot), msgs=msgs, event=event)
-
+            msgs.append(print_ticket(ticket))
+        await send_forward_msg(bot,gen_message_node_by_msgs(msgs),event=event)
 
 @set_schedule_matcher.handle()
 @set_schedule_matcher.got("time", "输入时间地点")

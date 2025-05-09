@@ -1,6 +1,6 @@
 from asyncio import sleep
 from pytz import timezone
-from ..utils import get_backend_bot, get_front_bot, send_combined_msg
+from ..utils import get_backend_bot, get_front_bot, gen_message_node_by_msgs
 from ..matcher import customer_message
 from ..model import Ticket, Status
 from ..config import plugin_config
@@ -89,7 +89,7 @@ async def reply_customer_message(bot: Bot, event: PrivateMessageEvent, session: 
     elif ticket.status == Status.PROCESSING:
         # 转发消息给工程师
         # is_focus = focus_ticket_map.get(ticket.engineer_id) == ticket.id
-        await send_combined_msg(
+        await gen_message_node_by_msgs(
             get_backend_bot(bot),
             [
                 Message("接收到来自以下客户的消息" + f" {ticket.id:0>3} " + "！"),

@@ -1,7 +1,7 @@
 from nonebot_plugin_apscheduler import scheduler
 from .config import plugin_config
 from nonebot import get_bot, require
-from .utils import get_backend_bot, get_front_bot, print_ticket, print_ticket_history, send_combined_msg, print_ticket_info, send_forward_message
+from .utils import gen_message_node_by_ticket, get_backend_bot, get_front_bot, print_ticket, get_messages_records, gen_message_node_by_msgs, print_ticket_info, gen_message_node_by_id, send_forward_msg
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select
 from .model import Ticket, Status
@@ -29,11 +29,12 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
-            await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = await print_ticket(ticket))
-            try:
-                await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
-            except:
-                await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
+            await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
+            await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+            # try:
+            #     await gen_message_node_by_id(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
+            # except:
+            #     await gen_message_node_by_msgs(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
 
             # 不要告诉机主转发出去了
             # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.second_reply)
@@ -54,10 +55,11 @@ async def ticket_check():
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
-            await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = await print_ticket(ticket))
-            try:
-                await send_forward_message(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
-            except:
-                await send_combined_msg(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
+            await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
+            await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+            # try:
+            #     await gen_message_node_by_id(get_front_bot(bot), await print_ticket_history(ticket), target_group_id=plugin_config.notify_group)
+            # except:
+            #     await gen_message_node_by_msgs(get_backend_bot(bot),await print_ticket_info(ticket),target_group_id=plugin_config.notify_group)
             # 不要告诉机主他在催单
             # await front_bot.send_private_msg(user_id=ticket_customer_id, message=plugin_config.third_reply)
