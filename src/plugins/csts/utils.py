@@ -47,14 +47,22 @@ async def send_forward_msg(
 async def gen_message_node_by_ticket(
         self_id: int|str,
         ticket: Ticket,
+        plaintext: bool=False
         ) -> list[dict]:
     message_records=await get_messages_records(ticket)
     messages = []
-    for msg in message_records:
-        if msg.type=="message_sent":
-            messages.append(to_node("工程师",self_id, msg.message))
-        else:
-            messages.append(to_node("机主",ticket.customer_id,msg.message))
+    if plaintext:
+        for msg in message_records:
+            if msg.type=="message_sent":
+                messages.append(to_node("工程师",self_id, msg.message))
+            else:
+                messages.append(to_node("机主",ticket.customer_id,msg.message))
+    else:
+        for msg in message_records:
+            if msg.type=="message_sent":
+                messages.append(to_node("工程师",self_id, msg.plain_text))
+            else:
+                messages.append(to_node("机主",ticket.customer_id,msg.plain_text))        
     return messages
 
 def gen_message_node_by_msgs(
