@@ -1,7 +1,7 @@
 from nonebot_plugin_apscheduler import scheduler
 from .config import plugin_config
 from nonebot import get_bot, require
-from .utils import gen_message_node_by_ticket, get_backend_bot, get_front_bot, print_ticket, get_messages_records, gen_message_node_by_msgs, print_ticket_info, gen_message_node_by_id, send_forward_msg
+from .utils import gen_message_node_by_ticket, get_backend_bot, get_front_bot, print_ticket, get_messages_records, gen_message_node_by_msgs, gen_message_node_by_id, send_forward_msg
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select
 from .model import Ticket, Status

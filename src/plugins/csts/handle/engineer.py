@@ -8,7 +8,7 @@ from nonebot.params import CommandArg, ShellCommandArgs, ArgPlainText
 from nonebot.exception import ParserExit
 from ..config import plugin_config
 from pytz import timezone
-from ..utils import gen_message_node_by_id, gen_message_node_by_ticket, get_db_ticket, qq_get_db_ticket, gen_message_node_by_msgs, print_ticket_info, print_ticket, get_backend_bot, get_front_bot, get_messages_records, send_forward_msg, to_node, validate_ticket_id
+from ..utils import gen_message_node_by_id, gen_message_node_by_ticket, get_db_ticket, qq_get_db_ticket, gen_message_node_by_msgs, print_ticket, get_backend_bot, get_front_bot, get_messages_records, send_forward_msg, to_node, validate_ticket_id
 from nonebot.matcher import Matcher
 from nonebot.permission import Permission, User
 from nonebot.adapters import MessageTemplate
