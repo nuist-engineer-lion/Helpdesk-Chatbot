@@ -24,16 +24,14 @@ async def ticket_check():
             await backend_bot.send_group_msg(group_id=plugin_config.notify_group,
                                              message=plugin_config.new_ticket_notify)
         for ticket in tickets:
-            ticket_id = ticket.id
-            ticket_customer_id = ticket.customer_id
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
-            await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
+            await backend_bot.send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
             try:
-                await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+                await send_forward_msg(backend_bot,await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
             except:
-                await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),target_group_id=plugin_config.notify_group)
+                await send_forward_msg(backend_bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket,True), target_group_id=plugin_config.notify_group)
         
 
     # 筛选出所有处于alarming但是已经过期的工单
@@ -46,13 +44,11 @@ async def ticket_check():
                                              message=plugin_config.alarm_ticket_notify)
 
         for ticket in tickets:
-            ticket_id = ticket.id
-            ticket_customer_id = ticket.customer_id
             # 将工单状态更新为pending
             ticket.status = Status.PENDING
             # 转发消息给通知群
             await get_backend_bot(bot).send_group_msg(group_id=int(plugin_config.notify_group),message = print_ticket(ticket))
             try:
-                await send_forward_msg(get_backend_bot(bot),await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
+                await send_forward_msg(backend_bot,await gen_message_node_by_ticket(get_front_bot(bot).self_id,ticket),target_group_id=plugin_config.notify_group)
             except:
-                 await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),target_group_id=plugin_config.notify_group)
+                await send_forward_msg(backend_bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket,True), target_group_id=plugin_config.notify_group)

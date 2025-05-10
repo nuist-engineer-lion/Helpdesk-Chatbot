@@ -83,7 +83,7 @@ async def get_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session: a
     try:
         await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket), event=event)
     except:
-        await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),event=event)
+        await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket,True), event=event)
 
 
 # 处理接单
@@ -129,7 +129,7 @@ async def untake_ticket(bot: Bot, matcher: Matcher, event: MessageEvent, session
     try:
         await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket), target_group_id=plugin_config.notify_group)
     except:
-        await send_forward_msg(get_front_bot(bot),gen_message_node_by_id(await get_messages_records(ticket)),event=event)
+        await send_forward_msg(bot, await gen_message_node_by_ticket(get_front_bot(bot).self_id, ticket,True), event=event)
     await bot.send_group_msg(group_id=int(plugin_config.notify_group),
                              message=f"工程师{engineer_id}有事暂时无法处理工单 {id:0>3} ，工单已重新进入待接单状态！")
     await untake_ticket_matcher.finish("放单成功！")
