@@ -196,8 +196,8 @@ async def close_ticket_by_id(bot: Bot, matcher: Matcher, event: MessageEvent, se
 
 @close_many_ticket_matcher.handle()
 # 批量关单
-async def _(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, ids: str = ArgPlainText()):
-    ids_list = ids.split(" ")
+async def _(bot: Bot, matcher: Matcher, event: MessageEvent, session: async_scoped_session, args: Message = CommandArg()):
+    ids_list = str(args).split(" ")
     for id in ids_list:
         ticket = await get_db_ticket(id, matcher, session)
 
