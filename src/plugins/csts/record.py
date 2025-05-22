@@ -14,7 +14,7 @@ from nonebot_plugin_session_orm import get_session_persist_id
 
 adapter = SupportedAdapter.onebot_v11
 
-on_message_sent = on("message_sent", priority=0,block=True)
+on_message_sent = on("message_sent", priority=0,block=False)
 @on_message_sent.handle()
 async def record_sent(bot: Bot, event: Event):
     data = model_dump(event)    
