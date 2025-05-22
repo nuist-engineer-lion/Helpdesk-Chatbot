@@ -12,6 +12,7 @@ dependencies = [
     "pydantic",
     "nonebot-plugin-orm[sqlite]",
     "nonebot-adapter-onebot",
+    "nonebot-adapter-feishu",
     "pytz"
 ]
 authors = [
@@ -21,7 +22,8 @@ authors = [
 
 [tool.nonebot]
 adapters = [
-    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
+    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" },
+    {name = "飞书", module_name = "nonebot.adapters.feishu"}
 ]
 plugins = ["nonebot_plugin_localstore", "nonebot_plugin_orm", "nonebot_plugin_chatrecorder", "nonebot_plugin_apscheduler", "nonebot_plugin_datastore"]
 plugin_dirs = ["src/plugins"]

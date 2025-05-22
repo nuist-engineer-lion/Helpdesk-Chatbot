@@ -2,6 +2,7 @@ pydantic
 pytz
 nonebot2[fastapi]
 nonebot-adapter-onebot
+nonebot-adapter-feishu
 nonebot-plugin-localstore
 nonebot_plugin_chatrecorder==0.6.2
 nonebot-plugin-apscheduler
